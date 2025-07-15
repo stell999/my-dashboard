@@ -74,7 +74,7 @@ export default function LoginPage() {
         </button>
 
         <div className="mt-4 text-sm text-gray-600">
-          <p>أسماء الحسابات المتاحة:</p>
+          {/* <p>أسماء الحسابات المتاحة:</p>
           <ul className="list-disc list-inside">
             <li>الأدمن: <b>admin</b></li>
             <li>قسم مطفي: <b>matfi</b></li>
@@ -82,7 +82,7 @@ export default function LoginPage() {
             <li>قسم سوفت وير: <b>software</b></li>
             <li>قسم معالجات: <b>processors</b></li>
             <li>قسم أعطال خفيفة: <b>light</b></li>
-          </ul>
+          </ul> */}
         </div>
       </form>
     </div>
