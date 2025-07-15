@@ -1,35 +1,26 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-/* الألوان والخطوط الافتراضية */
+/* متغيراتك الشخصية (اختياري) */
 :root {
   --background: #ffffff;
-  --foreground: #000000; /* ← تم تعديله ليكون أسود حقيقي لتباين أقوى */
+  --foreground: #000000;
   --font-sans: Arial, Helvetica, sans-serif;
   --font-weight-important: 600;
-  --opacity-text: 1; /* ← الشفافية كاملة */
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
-}
-/* إعدادات الجسم */
+/* تخصيص الجسم */
 body {
-  background: var(--background) !important;
-  color: var(--foreground) !important;
+  background-color: var(--background);
+  color: var(--foreground);
   font-family: var(--font-sans);
-  opacity: 1 !important; /* ← أزلنا الاعتماد على المتغير */
   font-weight: var(--font-weight-important);
 }
 
-
-
-/* خيار إضافي لإجبار وضوح الحقول */
+/* حقول الإدخال */
 input, textarea, select {
-  color: var(--foreground) !important;
-  background-color: #fff !important;
-  opacity: 1 !important;
-  font-weight: 500 !important;
+  color: var(--foreground);
+  background-color: #fff;
+  font-weight: 500;
 }

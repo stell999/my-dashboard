@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
-import { supabase } from "../app/lib/supabaseClient";
+import { supabase } from "./lib/supabaseClient";
 
 const DEPARTMENTS = [
   { value: "", label: "اختر القسم" },
@@ -36,6 +36,7 @@ const initialFormData = {
   priorityColor: PRIORITY_OPTIONS[2],
   employeeName: "",
 };
+
 
 function getPriorityColorClass(text) {
   if (!text) return "bg-gray-400";
