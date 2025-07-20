@@ -1,15 +1,76 @@
 'use client';
 
 import { useEffect, useState, useRef } from "react";
-import { supabase } from "../../lib/supabaseClient";
+import { supabase } from "../../../lib/supabaseClient";
 import { useRouter } from "next/navigation";
 
-const STATUS_OPTIONS = ["جاري العمل", "تم الإصلاح", "تم التسليم", "لا يصلح"];
+const STATUS_OPTIONS = [
+  "جاري العمل",
+  "جاري الصيانة",
+  "تم الإصلاح",
+  "تم التسليم",
+  "لا يصلح",
+  "انتظار",
+  "زبون مابدو",
+  "صلح"
+];
 
-// افتراضياً، يأتي currentUser وcurrentUserRole وcurrentUserDepartment من مكان المصادقة الحقيقية (auth)
-const currentUser = "employee1"; // يمكنك تغييرها في بيئتك الحقيقية
+const DEPARTMENTS = [
+  "مطفي",
+  "شاشات",
+  "سوفت وير",
+  "معالجات",
+  "أعطال خفيفة",
+];
+
+// بيانات المستخدم (في بيئة حقيقية تجلب من auth)
+const currentUser = "employee1"; // مثال
 const currentUserRole = "admin"; // "admin" أو "employee"
-const currentUserDepartment = "أعطال خفيفة"; // القسم الخاص بالمستخدم (مثال)
+const initialDepartment = "أعطال خفيفة";
+
+function SearchBox({ searchTerm, setSearchTerm }) {
+  return (
+    <input
+      type="text"
+      placeholder="بحث باسم الزبون..."
+      className="w-full p-2 border rounded mb-4"
+      value={searchTerm}
+      onChange={(e) => setSearchTerm(e.target.value)}
+      aria-label="بحث باسم الزبون"
+    />
+  );
+}
+
+function Filters({ dateFilter, setDateFilter, statusFilter, setStatusFilter }) {
+  return (
+    <div className="mt-4 flex flex-col md:flex-row md:justify-end gap-4 mb-4">
+      <div className="flex items-center gap-2">
+        <label className="text-gray-700 whitespace-nowrap">تاريخ معين:</label>
+        <input
+          type="date"
+          className="border p-2 rounded"
+          value={dateFilter}
+          onChange={(e) => setDateFilter(e.target.value)}
+          aria-label="تاريخ معين للفلترة"
+        />
+      </div>
+      <div className="flex items-center gap-2">
+        <label className="text-gray-700 whitespace-nowrap">الحالة:</label>
+        <select
+          className="border p-2 rounded"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          aria-label="فلترة حسب الحالة"
+        >
+          <option value="الكل">الكل</option>
+          {STATUS_OPTIONS.map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+}
 
 function ChatBox({ deviceId, currentUser, currentUserDepartment }) {
   const [messages, setMessages] = useState([]);
@@ -18,16 +79,14 @@ function ChatBox({ deviceId, currentUser, currentUserDepartment }) {
 
   useEffect(() => {
     if (deviceId) fetchMessages();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deviceId]);
 
   async function fetchMessages() {
-    // جلب الرسائل الخاصة بهذا الجهاز فقط والتي تكون إما من admin أو من قسم أعطال خفيفة
     const { data, error } = await supabase
       .from("device_notes")
       .select("*")
       .eq("device_id", deviceId)
-      .in("sender", ["admin", "أعطال خفيفة"]) // فقط الرسائل من هذين الطرفين
+      .in("sender", ["admin", currentUserDepartment])
       .order("created_at", { ascending: true });
 
     if (error) {
@@ -42,13 +101,8 @@ function ChatBox({ deviceId, currentUser, currentUserDepartment }) {
   async function sendMessage() {
     if (!newMessage.trim()) return;
 
-    // تعيين اسم المرسل وفقاً للحالة
-    let senderName = "";
-    if (currentUser === "admin") {
-      senderName = "admin";
-    } else if (currentUserDepartment === "أعطال خفيفة") {
-      senderName = "أعطال خفيفة";
-    } else {
+    let senderName = currentUser === "admin" ? "admin" : currentUserDepartment;
+    if (!senderName) {
       alert("غير مسموح لك بإرسال رسالة في هذا الشات");
       return;
     }
@@ -79,7 +133,7 @@ function ChatBox({ deviceId, currentUser, currentUserDepartment }) {
   return (
     <div className="border rounded p-3 bg-white shadow mt-2 max-h-60 overflow-y-auto">
       <div className="mb-2 font-bold text-right">
-        محادثة الجهاز #{deviceId} (قسم: أعطال خفيفة)
+        محادثة الجهاز #{deviceId} (قسم: {currentUserDepartment})
       </div>
       <div className="space-y-2">
         {messages.length === 0 ? (
@@ -89,12 +143,11 @@ function ChatBox({ deviceId, currentUser, currentUserDepartment }) {
             <div
               key={msg.id}
               className={`p-2 rounded ${
-                msg.sender === (currentUser === "admin" ? "admin" : "أعطال خفيفة")
+                msg.sender === (currentUser === "admin" ? "admin" : currentUserDepartment)
                   ? "bg-blue-200 text-right"
                   : "bg-gray-200 text-left"
               }`}
             >
-              {/* عرض اسم المرسل */}
               <div className="text-xs text-gray-600">{msg.sender}</div>
               <div>{msg.message}</div>
               <div className="text-xs text-gray-500">
@@ -132,33 +185,55 @@ export default function DepartmentPage() {
   const [employees, setEmployees] = useState([]);
   const [openChatId, setOpenChatId] = useState(null);
 
+  const [currentDepartment, setCurrentDepartment] = useState(initialDepartment);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("الكل");
+  const [dateFilter, setDateFilter] = useState("");
+
   const router = useRouter();
   const [showPrompt, setShowPrompt] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
-    fetchDevices();
     fetchEmployees();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    fetchDevices();
+  }, [currentDepartment, searchTerm, statusFilter, dateFilter]);
+
   async function fetchDevices() {
-    let query = supabase.from("devices").select("*");
-    // جلب الأجهزة فقط لقسم أعطال خفيفة سواء كان أدمن أو موظف، لا تعرض كل الأقسام هنا
-    query = query.eq("department", "أعطال خفيفة");
+    let query = supabase.from("devices").select("*").eq("department", currentDepartment);
+
+    if (statusFilter !== "الكل") {
+      query = query.eq("status", statusFilter);
+    }
+
+    if (searchTerm.trim() !== "") {
+      query = query.ilike("customerName", `%${searchTerm.trim()}%`);
+    }
+
+    if (dateFilter) {
+      const fromDate = new Date(dateFilter);
+      fromDate.setHours(0, 0, 0, 0);
+      const toDate = new Date(dateFilter);
+      toDate.setHours(23, 59, 59, 999);
+      query = query.gte("created_at", fromDate.toISOString()).lte("created_at", toDate.toISOString());
+    }
 
     const { data, error } = await query;
 
-    if (!error && data) setDevices(data);
+    if (error) {
+      console.error("خطأ في جلب الأجهزة:", error);
+      setDevices([]);
+    } else {
+      setDevices(data);
+    }
   }
 
   async function fetchEmployees() {
-    let query = supabase.from("employees").select("name");
-    // جلب موظفي قسم أعطال خفيفة فقط
-    query = query.eq("department", "أعطال خفيفة");
-
-    const { data, error } = await query;
+    const { data, error } = await supabase.from("employees").select("name");
     if (!error && data) setEmployees(data.map((emp) => emp.name));
   }
 
@@ -190,6 +265,22 @@ export default function DepartmentPage() {
     }
   }
 
+  async function handleChangeDepartment(id, newDepartment) {
+    if (currentUserRole !== "admin") return alert("لا تملك صلاحية تعديل القسم");
+
+    const { error } = await supabase
+      .from("devices")
+      .update({ department: newDepartment })
+      .eq("id", id);
+
+    if (!error) {
+      // بعد تغيير القسم، نحذف الجهاز من القائمة لأن القسم تغيّر
+      setDevices((prev) => prev.filter((d) => d.id !== id));
+    } else {
+      alert("حدث خطأ أثناء تحديث القسم");
+    }
+  }
+
   function toggleChat(deviceId) {
     setOpenChatId((prev) => (prev === deviceId ? null : deviceId));
   }
@@ -214,8 +305,29 @@ export default function DepartmentPage() {
         <h1 className="text-2xl font-bold mb-6">
           {currentUserRole === "admin"
             ? "لوحة الصيانة (مشرف)"
-            : `قسم ${currentUserDepartment}`}
+            : `قسم ${currentDepartment}`}
         </h1>
+
+        {/* {currentUserRole === "admin" && (
+          <div className="mb-6">
+            <label htmlFor="department-select" className="block mb-1">
+              اختر القسم للعرض:
+            </label>
+            <select
+              id="department-select"
+              className="w-full p-2 rounded text-black"
+              value={currentDepartment}
+              onChange={(e) => setCurrentDepartment(e.target.value)}
+              aria-label="اختيار القسم للعرض"
+            >
+              {DEPARTMENTS.map((dept) => (
+                <option key={dept} value={dept}>
+                  {dept}
+                </option>
+              ))}
+            </select>
+          </div>
+        )} */}
 
         {currentUserRole === "admin" && (
           <>
@@ -282,8 +394,17 @@ export default function DepartmentPage() {
 
       <main className="flex-1 p-6 overflow-auto">
         <h2 className="text-xl font-semibold mb-4">
-          الأجهزة في قسم أعطال خفيفة
+          الأجهزة في قسم {currentDepartment}
         </h2>
+
+        {/* دمج صندوق البحث والفلترة */}
+        <SearchBox searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
+        <Filters
+          dateFilter={dateFilter}
+          setDateFilter={setDateFilter}
+          statusFilter={statusFilter}
+          setStatusFilter={setStatusFilter}
+        />
 
         <table className="min-w-full bg-white rounded shadow">
           <thead>
@@ -291,6 +412,7 @@ export default function DepartmentPage() {
               <th className="p-3">الزبون</th>
               <th className="p-3">الجهاز</th>
               <th className="p-3">العطل</th>
+              <th className="p-3">القسم</th>
               <th className="p-3">الموظف</th>
               <th className="p-3">الحالة</th>
               <th className="p-3">الشات</th>
@@ -299,7 +421,7 @@ export default function DepartmentPage() {
           <tbody>
             {devices.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-center p-4 text-gray-500">
+                <td colSpan={7} className="text-center p-4 text-gray-500">
                   لا توجد أجهزة في هذا القسم
                 </td>
               </tr>
@@ -309,6 +431,21 @@ export default function DepartmentPage() {
                   <td className="p-3">{d.customerName}</td>
                   <td className="p-3">{d.deviceName}</td>
                   <td className="p-3">{d.issue}</td>
+                  <td className="p-3">
+                    <select
+                      value={d.department}
+                      onChange={(e) => handleChangeDepartment(d.id, e.target.value)}
+                      className="border rounded px-2 py-1"
+                      disabled={currentUserRole !== "admin" && currentUser !== d.employeeName}
+                      aria-label={`تغيير القسم للجهاز رقم ${d.id}`}
+                    >
+                      {DEPARTMENTS.map((dept) => (
+                        <option key={dept} value={dept}>
+                          {dept}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
                   <td className="p-3">
                     <select
                       value={d.employeeName}
@@ -353,7 +490,7 @@ export default function DepartmentPage() {
                         <ChatBox
                           deviceId={d.id}
                           currentUser={currentUser}
-                          currentUserDepartment={currentUserDepartment}
+                          currentUserDepartment={currentDepartment}
                         />
                       </div>
                     )}
