@@ -14,7 +14,8 @@ export const STATUS_OPTIONS = [
   "لا يصلح",
   "انتظار",
   "زبون مابدو",
-  "صلح"
+  "صلح",
+  "مرتجع"
 ];
 
 export const PRIORITY_OPTIONS = [

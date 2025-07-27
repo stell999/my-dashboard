@@ -150,7 +150,6 @@ export default function EmployeesPage() {
           )}
         </div>
       </div>
-
       <div className="bg-white rounded shadow">
         {loading ? (
           <p className="p-4 text-center">جاري التحميل...</p>

@@ -30,12 +30,15 @@ export default function DeviceTable({
             <th className="p-2">الأولوية</th>
             <th className="p-2">خيارات</th>
             <th className="p-2">محادثة</th>
+            {/* الأعمدة الجديدة */}
+            <th className="p-2">تاريخ التسليم</th>
+            <th className="p-2">وقت التسليم</th>
           </tr>
         </thead>
         <tbody>
           {devices.length === 0 && (
             <tr>
-              <td colSpan="10" className="text-center p-4">لا توجد أجهزة</td>
+              <td colSpan="12" className="text-center p-4">لا توجد أجهزة</td>
             </tr>
           )}
           {devices.map((device, i) => (
@@ -44,7 +47,6 @@ export default function DeviceTable({
               <td className="p-2">{device.customerName}</td>
               <td className="p-2">{device.deviceName}</td>
               <td className="p-2">{device.issue}</td>
-
               <td className="p-2">
                 <select
                   value={device.department}
@@ -56,7 +58,6 @@ export default function DeviceTable({
                   ))}
                 </select>
               </td>
-
               <td className="p-2">
                 <select
                   value={device.employeeName}
@@ -68,7 +69,6 @@ export default function DeviceTable({
                   ))}
                 </select>
               </td>
-
               <td className="p-2">
                 <select
                   value={device.status}
@@ -80,7 +80,6 @@ export default function DeviceTable({
                   ))}
                 </select>
               </td>
-
               <td className="p-2">
                 <span
                   className={`text-white px-2 py-1 rounded ${getPriorityColorClass(device.priorityColor)}`}
@@ -88,7 +87,6 @@ export default function DeviceTable({
                   {device.priorityColor}
                 </span>
               </td>
-
               <td className="p-2">
                 <button
                   onClick={() => handleDeleteDevice(device.id)}
@@ -97,7 +95,6 @@ export default function DeviceTable({
                   حذف
                 </button>
               </td>
-
               <td className="p-2">
                 <button
                   onClick={() => toggleChat(device.id)}
@@ -111,6 +108,9 @@ export default function DeviceTable({
                   )}
                 </button>
               </td>
+              {/* الأعمدة الجديدة */}
+              <td className="p-2">{device.delivery_date || "-"}</td>
+              <td className="p-2">{device.delivery_time || "-"}</td>
             </tr>
           ))}
         </tbody>

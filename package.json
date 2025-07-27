@@ -13,12 +13,15 @@
     "bufferutil": "^4.0.9",
     "jspdf": "^3.0.1",
     "jspdf-autotable": "^5.0.2",
+    "lucide-react": "^0.526.0",
     "next": "^15.4.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "utf-8-validate": "^6.0.5"
+    "utf-8-validate": "^6.0.5",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@types/react": "19.1.8",
     "autoprefixer": "^10.4.21",
     "eslint": "^8.45.0",
     "eslint-config-next": "13.4.7",

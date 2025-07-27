@@ -1,5 +1,6 @@
 'use client';
 
+
 export default function Header({ showForm, setShowForm, customerRef }) {
   return (
     <div className="mb-3 px-3 py-3 bg-white shadow-md rounded-md flex items-center justify-between ">

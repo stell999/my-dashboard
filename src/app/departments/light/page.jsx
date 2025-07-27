@@ -6,13 +6,13 @@ import { useRouter } from "next/navigation";
 
 const STATUS_OPTIONS = [
   "جاري العمل",
-  "جاري الصيانة",
   "تم الإصلاح",
   "تم التسليم",
   "لا يصلح",
   "انتظار",
   "زبون مابدو",
-  "صلح"
+  "صلح",
+  "مرتجع"
 ];
 
 const DEPARTMENTS = [
@@ -23,10 +23,10 @@ const DEPARTMENTS = [
   "أعطال خفيفة",
 ];
 
-// بيانات المستخدم (في بيئة حقيقية تجلب من auth)
-const currentUser = "employee1"; // مثال
+// بيانات المستخدم المفترض أنها من نظام المصادقة
+const currentUser = "employee1"; // يمكن تغييره حسب بيئتك
 const currentUserRole = "admin"; // "admin" أو "employee"
-const initialDepartment = "أعطال خفيفة";
+const initialDepartment = "أعطال خفيفة" 
 
 function SearchBox({ searchTerm, setSearchTerm }) {
   return (
@@ -64,7 +64,9 @@ function Filters({ dateFilter, setDateFilter, statusFilter, setStatusFilter }) {
         >
           <option value="الكل">الكل</option>
           {STATUS_OPTIONS.map((s) => (
-            <option key={s} value={s}>{s}</option>
+            <option key={s} value={s}>
+              {s}
+            </option>
           ))}
         </select>
       </div>
@@ -79,6 +81,7 @@ function ChatBox({ deviceId, currentUser, currentUserDepartment }) {
 
   useEffect(() => {
     if (deviceId) fetchMessages();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deviceId]);
 
   async function fetchMessages() {
@@ -98,31 +101,38 @@ function ChatBox({ deviceId, currentUser, currentUserDepartment }) {
     }
   }
 
-  async function sendMessage() {
-    if (!newMessage.trim()) return;
+async function sendMessage() {
+  if (!newMessage.trim()) return;
 
-    let senderName = currentUser === "admin" ? "admin" : currentUserDepartment;
-    if (!senderName) {
-      alert("غير مسموح لك بإرسال رسالة في هذا الشات");
-      return;
-    }
+  let senderName = "أعطال خفيفة";
 
-    const { error } = await supabase.from("device_notes").insert([
-      {
-        device_id: deviceId,
-        sender: senderName,
-        message: newMessage.trim(),
-        created_at: new Date().toISOString(),
-      },
-    ]);
-
-    if (error) {
-      alert("خطأ في إرسال الرسالة");
-      return;
-    }
-    setNewMessage("");
-    fetchMessages();
+  // إرسال الرسالة باسم القسم فقط، مثل "شاشات"
+  if (currentUserDepartment) {
+    senderName = currentUserDepartment;
+  } else {
+    alert("غير مسموح لك بإرسال رسالة في هذا الشات");
+    return;
   }
+
+  const { error } = await supabase.from("device_notes").insert([
+    {
+      device_id: deviceId,
+      sender: senderName,
+      message: newMessage.trim(),
+      created_at: new Date().toISOString(),
+      is_read: false, // تأكد من وجود هذا العمود في جدول device_notes
+    },
+  ]);
+
+  if (error) {
+    alert("خطأ في إرسال الرسالة");
+    return;
+  }
+
+  setNewMessage("");
+  fetchMessages();
+}
+
 
   function scrollToBottom() {
     setTimeout(() => {
@@ -185,10 +195,14 @@ export default function DepartmentPage() {
   const [employees, setEmployees] = useState([]);
   const [openChatId, setOpenChatId] = useState(null);
 
-  const [currentDepartment, setCurrentDepartment] = useState(initialDepartment);
+  // حالة البحث والفلترة
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("الكل");
   const [dateFilter, setDateFilter] = useState("");
+
+  const [currentDepartment, setCurrentDepartment] = useState(initialDepartment);
+
+  const [unreadCounts, setUnreadCounts] = useState({}); // العداد الخاص بالرسائل غير المقروءة
 
   const router = useRouter();
   const [showPrompt, setShowPrompt] = useState(false);
@@ -203,17 +217,25 @@ export default function DepartmentPage() {
     fetchDevices();
   }, [currentDepartment, searchTerm, statusFilter, dateFilter]);
 
+  useEffect(() => {
+    fetchUnreadCounts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [devices]);
+
   async function fetchDevices() {
     let query = supabase.from("devices").select("*").eq("department", currentDepartment);
 
+    // فلترة الحالة
     if (statusFilter !== "الكل") {
       query = query.eq("status", statusFilter);
     }
 
+    // فلترة البحث
     if (searchTerm.trim() !== "") {
       query = query.ilike("customerName", `%${searchTerm.trim()}%`);
     }
 
+    // فلترة التاريخ
     if (dateFilter) {
       const fromDate = new Date(dateFilter);
       fromDate.setHours(0, 0, 0, 0);
@@ -235,6 +257,55 @@ export default function DepartmentPage() {
   async function fetchEmployees() {
     const { data, error } = await supabase.from("employees").select("name");
     if (!error && data) setEmployees(data.map((emp) => emp.name));
+  }
+
+  // جلب عدد الرسائل غير المقروءة لكل جهاز
+  async function fetchUnreadCounts() {
+    if (devices.length === 0) {
+      setUnreadCounts({});
+      return;
+    }
+
+    const deviceIds = devices.map((d) => d.id);
+
+    // نفترض أن الرسائل غير المقروءة هي التي is_read = false، والمرسلة من الطرف الآخر
+    const senderToExclude = currentUser === "admin" ? "admin" : currentDepartment;
+
+    const { data, error } = await supabase
+      .from("device_notes")
+      .select("device_id")
+      .in("device_id", deviceIds)
+      .neq("sender", senderToExclude)
+      .eq("is_read", false);
+
+    if (error) {
+      console.error("خطأ في جلب الرسائل غير المقروءة:", error);
+      setUnreadCounts({});
+      return;
+    }
+
+    // عد الرسائل غير المقروءة لكل جهاز
+    const counts = {};
+    data.forEach((msg) => {
+      counts[msg.device_id] = (counts[msg.device_id] || 0) + 1;
+    });
+
+    setUnreadCounts(counts);
+  }
+
+  async function markMessagesAsRead(deviceId) {
+    const senderToExclude = currentUser === "admin" ? "admin" : currentDepartment;
+
+    const { error } = await supabase
+      .from("device_notes")
+      .update({ is_read: true })
+      .eq("device_id", deviceId)
+      .neq("sender", senderToExclude)
+      .eq("is_read", false);
+
+    if (error) {
+      console.error("خطأ في تحديث حالة الرسائل كمقروءة:", error);
+    }
   }
 
   async function handleChangeStatus(id, newStatus) {
@@ -274,7 +345,7 @@ export default function DepartmentPage() {
       .eq("id", id);
 
     if (!error) {
-      // بعد تغيير القسم، نحذف الجهاز من القائمة لأن القسم تغيّر
+      // حذف الجهاز من العرض لأنه انتقل لقسم آخر
       setDevices((prev) => prev.filter((d) => d.id !== id));
     } else {
       alert("حدث خطأ أثناء تحديث القسم");
@@ -282,7 +353,14 @@ export default function DepartmentPage() {
   }
 
   function toggleChat(deviceId) {
-    setOpenChatId((prev) => (prev === deviceId ? null : deviceId));
+    if (openChatId === deviceId) {
+      setOpenChatId(null);
+    } else {
+      setOpenChatId(deviceId);
+      // إعادة تعيين عداد الرسائل غير المقروءة لهذا الجهاز
+      setUnreadCounts((prev) => ({ ...prev, [deviceId]: 0 }));
+      markMessagesAsRead(deviceId);
+    }
   }
 
   function handleBackClick() {
@@ -302,33 +380,20 @@ export default function DepartmentPage() {
   return (
     <div dir="rtl" className="min-h-screen bg-gray-100 flex">
       <aside className="w-64 bg-blue-900 text-white p-6 flex flex-col">
+        <div className="flex justify-end mb-4 bg-white ">
+          <img
+            src="/logo.png"
+            alt="شعار الشركة"
+            className="h-12 w-auto object-contain"
+            aria-hidden="true"
+          />
+        </div>
+
         <h1 className="text-2xl font-bold mb-6">
           {currentUserRole === "admin"
             ? "لوحة الصيانة (مشرف)"
             : `قسم ${currentDepartment}`}
         </h1>
-
-        {/* {currentUserRole === "admin" && (
-          <div className="mb-6">
-            <label htmlFor="department-select" className="block mb-1">
-              اختر القسم للعرض:
-            </label>
-            <select
-              id="department-select"
-              className="w-full p-2 rounded text-black"
-              value={currentDepartment}
-              onChange={(e) => setCurrentDepartment(e.target.value)}
-              aria-label="اختيار القسم للعرض"
-            >
-              {DEPARTMENTS.map((dept) => (
-                <option key={dept} value={dept}>
-                  {dept}
-                </option>
-              ))}
-            </select>
-          </div>
-        )} */}
-
         {currentUserRole === "admin" && (
           <>
             <button
@@ -397,7 +462,7 @@ export default function DepartmentPage() {
           الأجهزة في قسم {currentDepartment}
         </h2>
 
-        {/* دمج صندوق البحث والفلترة */}
+        {/* البحث والفلترة */}
         <SearchBox searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
         <Filters
           dateFilter={dateFilter}
@@ -415,6 +480,7 @@ export default function DepartmentPage() {
               <th className="p-3">القسم</th>
               <th className="p-3">الموظف</th>
               <th className="p-3">الحالة</th>
+              <th className="p-3">الاولوية</th>
               <th className="p-3">الشات</th>
             </tr>
           </thead>
@@ -466,30 +532,57 @@ export default function DepartmentPage() {
                       value={d.status}
                       onChange={(e) => handleChangeStatus(d.id, e.target.value)}
                       className="border rounded px-2 py-1"
-                      disabled={currentUserRole !== "admin"}
-                      aria-label={`تغيير الحالة للجهاز رقم ${d.id}`}
+                      disabled={currentUserRole !== "admin" && currentUser !== d.employeeName}
+                      aria-label={`تغيير حالة الجهاز رقم ${d.id}`}
                     >
-                      {STATUS_OPTIONS.map((status) => (
-                        <option key={status} value={status}>
-                          {status}
+                      {STATUS_OPTIONS.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
                         </option>
                       ))}
                     </select>
                   </td>
                   <td className="p-3">
+  <span
+    className={`inline-block w-4 h-4 rounded-full ${
+      d.priorityColor === "أحمر"
+        ? "bg-red-500"
+        : d.priorityColor === "أصفر" || d.priorityColor === "برتقالي"
+        ? "bg-yellow-400"
+        : d.priorityColor === "أخضر"
+        ? "bg-green-500"
+        : "bg-gray-400"
+    }`}
+  >
+  </span>
+</td>
+                  <td className="p-3 text-center relative">
                     <button
                       onClick={() => toggleChat(d.id)}
-                      className="bg-blue-600 text-white px-3 py-1 rounded"
+                      className="bg-blue-600 text-white px-3 py-1 rounded relative"
                       aria-expanded={openChatId === d.id}
                       aria-controls={`chatbox-${d.id}`}
                     >
                       {openChatId === d.id ? "إغلاق الشات" : "فتح الشات"}
+
+                      {/* عداد الرسائل غير المقروءة */}
+                      {unreadCounts[d.id] > 0 && openChatId !== d.id && (
+                        <span
+                          className="absolute top-0 right-0 -mt-1 -mr-1 inline-flex items-center justify-center
+                                    px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full"
+                          aria-label={`${unreadCounts[d.id]} رسالة غير مقروءة`}
+                        >
+                          {unreadCounts[d.id]}
+                        </span>
+                      )}
                     </button>
+
+                    {/* صندوق الشات */}
                     {openChatId === d.id && (
                       <div id={`chatbox-${d.id}`} className="mt-2">
                         <ChatBox
                           deviceId={d.id}
-                          currentUser={currentUser}
+                          currentUser={currentUserRole === "admin" ? "admin" : currentUser}
                           currentUserDepartment={currentDepartment}
                         />
                       </div>

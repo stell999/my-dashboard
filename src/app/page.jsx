@@ -12,6 +12,9 @@ import DeviceForm from "../components/DeviceForm";
 import { STATUS_OPTIONS, PRIORITY_OPTIONS, DEPARTMENTS } from "../lib/constants";
 import { getPriorityColorClass } from "../lib/helpers";
 
+import BackupButton from './backup/backup';
+
+
 const initialFormData = {
   customerName: "",
   deviceName: "",
@@ -176,6 +179,8 @@ function DeviceTable({
             <th className="p-2">الموظف</th>
             <th className="p-2">الحالة</th>
             <th className="p-2">الأولوية</th>
+            <th className="p-2">تاريخ التسليم</th>
+            <th className="p-2">وقت التسليم</th>
             <th className="p-2">خيارات</th>
             <th className="p-2">محادثة</th>
           </tr>
@@ -183,7 +188,7 @@ function DeviceTable({
         <tbody>
           {devices.length === 0 && (
             <tr>
-              <td colSpan="12" className="text-center p-4">لا توجد أجهزة</td>
+              <td colSpan="14" className="text-center p-4">لا توجد أجهزة</td>
             </tr>
           )}
           {devices.map((device, i) => (
@@ -234,16 +239,16 @@ function DeviceTable({
                 </select>
               </td>
               <td className="p-2 flex items-center gap-2">
-                {/* الدائرة الصغيرة الملونة */}
                 <span
                   className={`w-4 h-4 rounded-full ${getPriorityColorClass(device.priorityColor)}`}
                   aria-label={`لون الأولوية ${device.priorityColor}`}
                 />
-                {/* اسم الأولوية */}
                 <span className="text-white px-2 py-1 rounded">
                   {device.priorityColor}
                 </span>
               </td>
+              <td className="p-2">{device.delivery_date || "-"}</td>
+              <td className="p-2">{device.delivery_time || "-"}</td>
               <td className="p-2">
                 <button
                   onClick={() => handleDeleteDevice(device.id)}
@@ -292,8 +297,8 @@ export default function Page() {
   const [dateFilter, setDateFilter] = useState("");
   const [formData, setFormData] = useState(initialFormData);
   const [openChatId, setOpenChatId] = useState(null);
+const [employeeFilter, setEmployeeFilter] = useState(""); // هنا يتم تعريف الفلتر
 
-  // مراجع الحقول للتنقل بالإنتر
   const customerRef = useRef(null);
   const deviceRef = useRef(null);
   const issueRef = useRef(null);
@@ -346,32 +351,32 @@ export default function Page() {
       setDevices([]);
     }
   }
+  
 
-async function fetchEmployees() {
-  try {
-    const { data, error } = await supabase
-      .from("employees")
-      .select("name, department");
+  async function fetchEmployees() {
+    try {
+      const { data, error } = await supabase
+        .from("employees")
+        .select("name, department");
 
-    if (error) {
-      throw error;
+      if (error) {
+        throw error;
+      }
+
+      setEmployees(Array.isArray(data) ? data : []);
+
+      if (data?.length > 0 && !formData.employeeName) {
+        setFormData((prev) => ({
+          ...prev,
+          employeeName: data[0].name,
+          department: data[0].department,
+        }));
+      }
+    } catch (error) {
+      console.error("❌ خطأ في جلب الموظفين:", error?.message || JSON.stringify(error) || error);
+      setEmployees([]);
     }
-
-    setEmployees(Array.isArray(data) ? data : []);
-
-    if (data?.length > 0 && !formData.employeeName) {
-      setFormData((prev) => ({
-        ...prev,
-        employeeName: data[0].name,
-        department: data[0].department,
-      }));
-    }
-  } catch (error) {
-    console.error("❌ خطأ في جلب الموظفين:", error?.message || JSON.stringify(error) || error);
-    setEmployees([]);
   }
-}
-
 
   function handleInputChange(e) {
     const { name, value } = e.target;
@@ -429,17 +434,28 @@ async function fetchEmployees() {
     }
   }
 
+  // التعديل الأساسي: تحديث delivery_date و delivery_time فقط عند الحالة "تم التسليم"
   async function handleChangeStatus(id, newStatus) {
     try {
-      const now = new Date();
-      const isoDate = now.toISOString().split("T")[0];
-      const isoTime = now.toLocaleTimeString("en-US", { hour12: false });
+      let updateData = { status: newStatus };
 
-      const { error } = await supabase.from("devices").update({ status: newStatus, date: isoDate, time: isoTime }).eq("id", id);
+      if (newStatus === "تم التسليم") {
+        const now = new Date();
+        updateData.delivery_date = now.toISOString().split("T")[0];
+        updateData.delivery_time = now.toLocaleTimeString("en-US", { hour12: false });
+      } else {
+        updateData.delivery_date = null;
+        updateData.delivery_time = null;
+      }
+
+      const { error } = await supabase.from("devices").update(updateData).eq("id", id);
 
       if (error) throw error;
+
       setDevices((prev) =>
-        prev.map((d) => (d.id === id ? { ...d, status: newStatus, date: isoDate, time: isoTime } : d))
+        prev.map((d) =>
+          d.id === id ? { ...d, ...updateData } : d
+        )
       );
     } catch (error) {
       console.error("فشل تحديث الحالة:", error);
@@ -452,13 +468,9 @@ async function fetchEmployees() {
       const emp = employees.find((emp) => emp.name === newEmployee);
       const newDepartment = emp ? emp.department : "";
 
-      const now = new Date();
-      const isoDate = now.toISOString().split("T")[0];
-      const isoTime = now.toLocaleTimeString("en-US", { hour12: false });
-
       const { error } = await supabase
         .from("devices")
-        .update({ employeeName: newEmployee, department: newDepartment, date: isoDate, time: isoTime })
+        .update({ employeeName: newEmployee, department: newDepartment })
         .eq("id", id);
 
       if (error) throw error;
@@ -466,7 +478,7 @@ async function fetchEmployees() {
       setDevices((prev) =>
         prev.map((d) =>
           d.id === id
-            ? { ...d, employeeName: newEmployee, department: newDepartment, date: isoDate, time: isoTime }
+            ? { ...d, employeeName: newEmployee, department: newDepartment }
             : d
         )
       );
@@ -478,19 +490,15 @@ async function fetchEmployees() {
 
   async function handleChangeDepartment(id, newDepartment) {
     try {
-      const now = new Date();
-      const isoDate = now.toISOString().split("T")[0];
-      const isoTime = now.toLocaleTimeString("en-US", { hour12: false });
-
       const { error } = await supabase
         .from("devices")
-        .update({ department: newDepartment, date: isoDate, time: isoTime })
+        .update({ department: newDepartment })
         .eq("id", id);
 
       if (error) throw error;
 
       setDevices((prev) =>
-        prev.map((d) => (d.id === id ? { ...d, department: newDepartment, date: isoDate, time: isoTime } : d))
+        prev.map((d) => (d.id === id ? { ...d, department: newDepartment } : d))
       );
     } catch (error) {
       console.error("فشل تحديث القسم:", error);
@@ -498,14 +506,44 @@ async function fetchEmployees() {
     }
   }
 
-  const filteredDevices = devices
-    .filter((d) => d.customerName?.toLowerCase().includes(searchTerm.toLowerCase()))
-    .filter((d) => statusFilter === "الكل" || d.status === statusFilter)
-    .filter((d) => !dateFilter || d.date === dateFilter);
+const filteredDevices = devices
+  .filter((d) => d.customerName?.toLowerCase().includes(searchTerm.toLowerCase()))
+  .filter((d) => statusFilter === "الكل" || d.status === statusFilter)
+  .filter((d) => !dateFilter || d.date === dateFilter)
+  .filter((d) => employeeFilter === "الكل" || !employeeFilter || d.employeeName === employeeFilter);
 
   function toggleChat(deviceId) {
     setOpenChatId((prev) => (prev === deviceId ? null : deviceId));
   }
+  useEffect(() => {
+  const devicesSub = supabase
+    .channel('realtime-devices')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'devices' },
+      () => {
+        fetchDevicesWithUnread(); // تحديث الأجهزة عند أي تغيير
+      }
+    )
+    .subscribe();
+
+  const notesSub = supabase
+    .channel('realtime-notes')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'device_notes' },
+      () => {
+        fetchDevicesWithUnread(); // تحديث عدد الرسائل غير المقروءة عند تغيّر المحادثات
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(devicesSub);
+    supabase.removeChannel(notesSub);
+  };
+}, []);
+
 
   return (
     <div dir="rtl" lang="ar" className="min-h-screen bg-gray-100 flex">
@@ -513,11 +551,14 @@ async function fetchEmployees() {
       <main className="flex-1 p-6">
         <Header showForm={showForm} setShowForm={setShowForm} customerRef={customerRef} />
         <Filters
-          dateFilter={dateFilter}
-          setDateFilter={setDateFilter}
-          statusFilter={statusFilter}
-          setStatusFilter={setStatusFilter}
-        />
+        
+  dateFilter={dateFilter}
+  setDateFilter={setDateFilter}
+  statusFilter={statusFilter}
+  setStatusFilter={setStatusFilter}
+  employeeFilter={employeeFilter}
+  setEmployeeFilter={setEmployeeFilter}
+/>
         <SearchBox searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
         {showForm && (
           <DeviceForm
@@ -541,6 +582,7 @@ async function fetchEmployees() {
           currentUser={currentUser}
           onReadMessages={fetchDevicesWithUnread}
         />
+        <BackupButton/>
       </main>
     </div>
   );
