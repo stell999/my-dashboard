@@ -542,20 +542,6 @@ export default function DepartmentPage() {
                       ))}
                     </select>
                   </td>
-                  <td className="p-3">
-  <span
-    className={`inline-block w-4 h-4 rounded-full ${
-      d.priorityColor === "أحمر"
-        ? "bg-red-500"
-        : d.priorityColor === "أصفر" || d.priorityColor === "برتقالي"
-        ? "bg-yellow-400"
-        : d.priorityColor === "أخضر"
-        ? "bg-green-500"
-        : "bg-gray-400"
-    }`}
-  >
-  </span>
-</td>
                   <td className="p-3 text-center relative">
                     <button
                       onClick={() => toggleChat(d.id)}
