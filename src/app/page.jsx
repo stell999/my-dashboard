@@ -323,34 +323,44 @@ const [employeeFilter, setEmployeeFilter] = useState(""); // هنا يتم تع�
     localStorage.setItem("searchTerm", searchTerm);
   }, [searchTerm]);
 
-  async function fetchDevicesWithUnread() {
-    try {
-      const { data: devicesData, error: devicesError } = await supabase.from("devices").select("*");
-      if (devicesError) throw devicesError;
+async function fetchDevicesWithUnread() {
+  try {
+    const { data: devicesData, error: devicesError } = await supabase.from("devices").select("*");
+    if (devicesError) throw devicesError;
 
-      const { data: unreadMessages, error: unreadError } = await supabase
-        .from("device_notes")
-        .select("device_id")
-        .not("read_by", "cs", `{${currentUser}}`);
+    const { data: unreadMessages, error: unreadError } = await supabase
+      .from("device_notes")
+      .select("device_id")
+      .not("read_by", "cs", `{${currentUser}}`);
 
-      if (unreadError) throw unreadError;
+    if (unreadError) throw unreadError;
 
-      const unreadCountMap = {};
-      unreadMessages.forEach((msg) => {
-        unreadCountMap[msg.device_id] = (unreadCountMap[msg.device_id] || 0) + 1;
-      });
+    const unreadCountMap = {};
+    unreadMessages.forEach((msg) => {
+      unreadCountMap[msg.device_id] = (unreadCountMap[msg.device_id] || 0) + 1;
+    });
 
-      const devicesWithUnread = devicesData.map((device) => ({
+    // فرز الأجهزة بحيث الأحدث (حسب التاريخ والوقت) تظهر أولاً
+    const devicesWithUnread = devicesData
+      .map((device) => ({
         ...device,
         unreadCount: unreadCountMap[device.id] || 0,
-      }));
+      }))
+      .sort((a, b) => {
+        // نرتب حسب التاريخ أولاً (نصّف الـ ISO string)
+        if (a.date === b.date) {
+          return b.time.localeCompare(a.time); // الوقت الأحدث أولاً
+        }
+        return b.date.localeCompare(a.date); // التاريخ الأحدث أولاً
+      });
 
-      setDevices(devicesWithUnread);
-    } catch (error) {
-      console.error("خطأ في تحميل الأجهزة مع عدد الرسائل غير المقروءة:", error);
-      setDevices([]);
-    }
+    setDevices(devicesWithUnread);
+  } catch (error) {
+    console.error("خطأ في تحميل الأجهزة مع عدد الرسائل غير المقروءة:", error);
+    setDevices([]);
   }
+}
+
   
 
   async function fetchEmployees() {
@@ -435,33 +445,32 @@ const [employeeFilter, setEmployeeFilter] = useState(""); // هنا يتم تع�
   }
 
   // التعديل الأساسي: تحديث delivery_date و delivery_time فقط عند الحالة "تم التسليم"
-  async function handleChangeStatus(id, newStatus) {
-    try {
-      let updateData = { status: newStatus };
+async function handleChangeStatus(id, newStatus) {
+  try {
+    const updateData = { status: newStatus };
 
-      if (newStatus === "تم التسليم") {
-        const now = new Date();
-        updateData.delivery_date = now.toISOString().split("T")[0];
-        updateData.delivery_time = now.toLocaleTimeString("en-US", { hour12: false });
-      } else {
-        updateData.delivery_date = null;
-        updateData.delivery_time = null;
-      }
-
-      const { error } = await supabase.from("devices").update(updateData).eq("id", id);
-
-      if (error) throw error;
-
-      setDevices((prev) =>
-        prev.map((d) =>
-          d.id === id ? { ...d, ...updateData } : d
-        )
-      );
-    } catch (error) {
-      console.error("فشل تحديث الحالة:", error);
-      alert("حدث خطأ أثناء تحديث الحالة");
+    if (newStatus === "تم التسليم") {
+      const now = new Date();
+      updateData.delivery_date = now.toISOString().split("T")[0];
+      updateData.delivery_time = now.toTimeString().split(" ")[0];  // << هنا الصيغة الصحيحة للعمود time
+    } else {
+      updateData.delivery_date = null;
+      updateData.delivery_time = null;
     }
+
+    const { error } = await supabase
+      .from("devices")
+      .update(updateData)
+      .eq("id", id);
+
+    if (error) throw error;
+
+    await fetchDevicesWithUnread();
+  } catch (error) {
+    console.error("فشل تحديث الحالة:", error);
+    alert("حدث خطأ أثناء تحديث الحالة: " + (error.message || error));
   }
+}
 
   async function handleChangeEmployee(id, newEmployee) {
     try {
@@ -547,7 +556,7 @@ const filteredDevices = devices
 
   return (
     <div dir="rtl" lang="ar" className="min-h-screen bg-gray-100 flex">
-      <Sidebar />
+      <Sidebar devices={devices} />
       <main className="flex-1 p-6">
         <Header showForm={showForm} setShowForm={setShowForm} customerRef={customerRef} />
         <Filters

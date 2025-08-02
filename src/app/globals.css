@@ -2,11 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
-/* متغيراتك الشخصية (اختياري) */
+/* متغيراتك الخاصة */
 :root {
-  --background: #ffffff;
-  --foreground: #000000;
-  --font-sans: Arial, Helvetica, sans-serif;
+  --background: #f9fafb;
+  --foreground: #1f2937;
+  --font-sans: 'Cairo', sans-serif;
   --font-weight-important: 600;
 }
 
@@ -16,11 +16,71 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
   font-weight: var(--font-weight-important);
+  line-height: 1.6;
+  @apply text-sm sm:text-base;
 }
 
-/* حقول الإدخال */
-input, textarea, select {
+/* الحاويات العامة */
+.container {
+  @apply px-4 sm:px-6 lg:px-8 mx-auto max-w-7xl;
+}
+
+/* عناوين */
+h1, h2, h3, h4 {
+  font-weight: bold;
   color: var(--foreground);
-  background-color: #fff;
+  @apply text-lg sm:text-xl md:text-2xl;
+}
+
+/* الحقول */
+input, textarea, select {
+  @apply w-full p-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-150 ease-in-out;
+  font-family: var(--font-sans);
   font-weight: 500;
+  background-color: #ffffff;
+  color: var(--foreground);
+}
+
+/* أزرار */
+button {
+  @apply px-4 py-2 rounded-md font-semibold text-white bg-blue-600 hover:bg-blue-700 transition duration-200 ease-in-out;
+  @apply text-sm sm:text-base;
+}
+
+/* جداول */
+.table-wrapper {
+  @apply w-full overflow-x-auto;
+}
+
+table {
+  @apply min-w-full table-auto border-collapse text-sm;
+}
+
+th, td {
+  @apply px-4 py-2 text-right border border-gray-200 whitespace-nowrap;
+  min-width: 100px;
+}
+
+@media (max-width: 640px) {
+  th, td {
+    @apply px-2 py-1 text-xs;
+    min-width: 80px;
+  }
+}
+
+/* الهوامش */
+.section {
+  @apply mb-6 sm:mb-8;
+}
+
+td:nth-child(6), th:nth-child(6) {
+  max-width:50px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+td:first-child, th:first-child {
+  min-width: 50px !important;
+  width: 50px !important;
+  text-align: center;
 }

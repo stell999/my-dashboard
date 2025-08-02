@@ -3,17 +3,18 @@
 import { useEffect, useState, useRef } from "react";
 import { supabase } from "../../../lib/supabaseClient";
 import { useRouter } from "next/navigation";
+import { STATUS_OPTIONS } from "../../../lib/constants";
 
-const STATUS_OPTIONS = [
-  "جاري العمل",
-  "تم الإصلاح",
-  "تم التسليم",
-  "لا يصلح",
-  "انتظار",
-  "زبون مابدو",
-  "صلح",
-  "مرتجع"
-];
+// const STATUS_OPTIONS = [
+//   "جاري العمل",
+//   "تم الإصلاح",
+//   "تم التسليم",
+//   "لا يصلح",
+//   "انتظار",
+//   "زبون مابدو",
+//   "صلح",
+//   "مرتجع"
+// ];
 
 const DEPARTMENTS = [
   "مطفي",
@@ -45,14 +46,6 @@ function Filters({ dateFilter, setDateFilter, statusFilter, setStatusFilter }) {
   return (
     <div className="mt-4 flex flex-col md:flex-row md:justify-end gap-4 mb-4">
       <div className="flex items-center gap-2">
-        <label className="text-gray-700 whitespace-nowrap">تاريخ معين:</label>
-        <input
-          type="date"
-          className="border p-2 rounded"
-          value={dateFilter}
-          onChange={(e) => setDateFilter(e.target.value)}
-          aria-label="تاريخ معين للفلترة"
-        />
       </div>
       <div className="flex items-center gap-2">
         <label className="text-gray-700 whitespace-nowrap">الحالة:</label>
@@ -208,6 +201,11 @@ export default function DepartmentPage() {
   const [showPrompt, setShowPrompt] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+
+      const statusCounts = STATUS_OPTIONS.map((status) => {
+      const count = devices.filter((d) => d.status === status).length;
+      return { status, count };
+    });
 
   useEffect(() => {
     fetchEmployees();
@@ -380,7 +378,7 @@ export default function DepartmentPage() {
   return (
     <div dir="rtl" className="min-h-screen bg-gray-100 flex">
       <aside className="w-64 bg-blue-900 text-white p-6 flex flex-col">
-        <div className="flex justify-end mb-4 bg-white ">
+                <div className="flex justify-end mb-4 bg-white ">
           <img
             src="/logo.png"
             alt="شعار الشركة"
@@ -449,14 +447,31 @@ export default function DepartmentPage() {
             )}
           </>
         )}
-
         {currentUserRole !== "admin" && (
           <p className="text-sm opacity-70 mb-4">
             ليس لديك صلاحية العودة للصفحة الرئيسية
           </p>
         )}
+        {/* ✅ هنا سيتم استخدام statusCounts داخل aside */}
+        <div className="mt-6">
+          <h2 className="text-lg font-semibold mb-3 text-blue-200 border-b border-blue-700 pb-1">
+            📊 الحالات
+          </h2>
+          <ul className="space-y-2 text-sm">
+            {statusCounts.map(({ status, count }) => (
+              <li
+                key={status}
+                className="flex justify-between items-center bg-blue-800 rounded-lg px-4 py-2 shadow-sm hover:bg-blue-700 transition"
+              >
+                <span className="truncate">{status}</span>
+                <span className="bg-black text-blue-900 text-xs font-semibold px-3 py-1 rounded-full shadow">
+                  {count}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
       </aside>
-
       <main className="flex-1 p-6 overflow-auto">
         <h2 className="text-xl font-semibold mb-4">
           الأجهزة في قسم {currentDepartment}
@@ -470,129 +485,132 @@ export default function DepartmentPage() {
           statusFilter={statusFilter}
           setStatusFilter={setStatusFilter}
         />
-
-        <table className="min-w-full bg-white rounded shadow">
-          <thead>
-            <tr className="bg-blue-100 text-right">
-              <th className="p-3">الزبون</th>
-              <th className="p-3">الجهاز</th>
-              <th className="p-3">العطل</th>
-              <th className="p-3">القسم</th>
-              <th className="p-3">الموظف</th>
-              <th className="p-3">الحالة</th>
-              <th className="p-3">الاولوية</th>
-              <th className="p-3">الشات</th>
-            </tr>
-          </thead>
-          <tbody>
-            {devices.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="text-center p-4 text-gray-500">
-                  لا توجد أجهزة في هذا القسم
-                </td>
-              </tr>
-            ) : (
-              devices.map((d) => (
-                <tr key={d.id} className="border-b align-top">
-                  <td className="p-3">{d.customerName}</td>
-                  <td className="p-3">{d.deviceName}</td>
-                  <td className="p-3">{d.issue}</td>
-                  <td className="p-3">
-                    <select
-                      value={d.department}
-                      onChange={(e) => handleChangeDepartment(d.id, e.target.value)}
-                      className="border rounded px-2 py-1"
-                      disabled={currentUserRole !== "admin" && currentUser !== d.employeeName}
-                      aria-label={`تغيير القسم للجهاز رقم ${d.id}`}
-                    >
-                      {DEPARTMENTS.map((dept) => (
-                        <option key={dept} value={dept}>
-                          {dept}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="p-3">
-                    <select
-                      value={d.employeeName}
-                      onChange={(e) => handleChangeEmployee(d.id, e.target.value)}
-                      className="border rounded px-2 py-1"
-                      disabled={currentUserRole !== "admin" && currentUser !== d.employeeName}
-                      aria-label={`تغيير الموظف للجهاز رقم ${d.id}`}
-                    >
-                      {employees.map((emp) => (
-                        <option key={emp} value={emp}>
-                          {emp}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="p-3">
-                    <select
-                      value={d.status}
-                      onChange={(e) => handleChangeStatus(d.id, e.target.value)}
-                      className="border rounded px-2 py-1"
-                      disabled={currentUserRole !== "admin" && currentUser !== d.employeeName}
-                      aria-label={`تغيير حالة الجهاز رقم ${d.id}`}
-                    >
-                      {STATUS_OPTIONS.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="p-3">
-  <span
-    className={`inline-block w-4 h-4 rounded-full ${
-      d.priorityColor === "أحمر"
-        ? "bg-red-500"
-        : d.priorityColor === "أصفر" || d.priorityColor === "برتقالي"
-        ? "bg-yellow-400"
-        : d.priorityColor === "أخضر"
-        ? "bg-green-500"
-        : "bg-gray-400"
-    }`}
-  >
-  </span>
-</td>
-                  <td className="p-3 text-center relative">
-                    <button
-                      onClick={() => toggleChat(d.id)}
-                      className="bg-blue-600 text-white px-3 py-1 rounded relative"
-                      aria-expanded={openChatId === d.id}
-                      aria-controls={`chatbox-${d.id}`}
-                    >
-                      {openChatId === d.id ? "إغلاق الشات" : "فتح الشات"}
-
-                      {/* عداد الرسائل غير المقروءة */}
-                      {unreadCounts[d.id] > 0 && openChatId !== d.id && (
-                        <span
-                          className="absolute top-0 right-0 -mt-1 -mr-1 inline-flex items-center justify-center
-                                    px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full"
-                          aria-label={`${unreadCounts[d.id]} رسالة غير مقروءة`}
-                        >
-                          {unreadCounts[d.id]}
-                        </span>
-                      )}
-                    </button>
-
-                    {/* صندوق الشات */}
-                    {openChatId === d.id && (
-                      <div id={`chatbox-${d.id}`} className="mt-2">
-                        <ChatBox
-                          deviceId={d.id}
-                          currentUser={currentUserRole === "admin" ? "admin" : currentUser}
-                          currentUserDepartment={currentDepartment}
-                        />
-                      </div>
+                <table className="min-w-full bg-white rounded shadow">
+                  <thead>
+                    <tr className="bg-blue-100 text-right">
+                      <th className="p-3">الزبون</th>
+                      <th className="p-3">الجهاز</th>
+                      <th className="p-3">العطل</th>
+                       <th className="p-3">التاريخ</th>
+                      <th className="p-3">الوقت</th>
+                      <th className="p-3">القسم</th>
+                      <th className="p-3">الموظف</th>
+                      <th className="p-3">الاولوية</th>
+                      <th className="p-3">الحالة</th>
+                      <th className="p-3">الشات</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {devices.length === 0 ? (
+                      <tr>
+                        <td colSpan={10} className="text-center p-4 text-gray-500">
+                          لا توجد أجهزة في هذا القسم
+                        </td>
+                      </tr>
+                    ) : (
+                      devices.map((d) => (
+                        <tr key={d.id} className="border-b align-top">
+                          <td className="p-3">{d.customerName}</td>
+                          <td className="p-3">{d.deviceName}</td>
+                          <td className="p-3">{d.issue}</td>
+                          <td className="p-3">{d.date}</td>
+                          <td className="p-3">{d.time}</td>
+                          <td className="p-3">
+                            <select
+                              value={d.department}
+                              onChange={(e) => handleChangeDepartment(d.id, e.target.value)}
+                              className="border rounded px-2 py-1"
+                              disabled={currentUserRole !== "admin" && currentUser !== d.employeeName}
+                              aria-label={`تغيير القسم للجهاز رقم ${d.id}`}
+                            >
+                              {DEPARTMENTS.map((dept) => (
+                                <option key={dept} value={dept}>
+                                  {dept}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="p-3">
+                            <select
+                              value={d.employeeName}
+                              onChange={(e) => handleChangeEmployee(d.id, e.target.value)}
+                              className="border rounded px-2 py-1"
+                              disabled={currentUserRole !== "admin" && currentUser !== d.employeeName}
+                              aria-label={`تغيير الموظف للجهاز رقم ${d.id}`}
+                            >
+                              {employees.map((emp) => (
+                                <option key={emp} value={emp}>
+                                  {emp}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="p-3">
+                          <span
+                            className={`inline-block w-4 h-4 rounded-full ${
+                              d.priorityColor === "أحمر"
+                                ? "bg-red-500"
+                                : d.priorityColor === "أصفر" || d.priorityColor === "برتقالي"
+                                ? "bg-yellow-400"
+                                : d.priorityColor === "أخضر"
+                                ? "bg-green-500"
+                                : "bg-gray-400"
+                            }`}
+                          >
+                          </span>
+                        </td>
+                          <td className="p-3">
+                            <select
+                              value={d.status}
+                              onChange={(e) => handleChangeStatus(d.id, e.target.value)}
+                              className="border rounded px-2 py-1"
+                              disabled={currentUserRole !== "admin" && currentUser !== d.employeeName}
+                              aria-label={`تغيير حالة الجهاز رقم ${d.id}`}
+                            >
+                              {STATUS_OPTIONS.map((s) => (
+                                <option key={s} value={s}>
+                                  {s}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="p-3 text-center relative">
+                            <button
+                              onClick={() => toggleChat(d.id)}
+                              className="bg-blue-600 text-white px-3 py-1 rounded relative"
+                              aria-expanded={openChatId === d.id}
+                              aria-controls={`chatbox-${d.id}`}
+                            >
+                              {openChatId === d.id ? "إغلاق الشات" : "فتح الشات"}
+        
+                              {/* عداد الرسائل غير المقروءة */}
+                              {unreadCounts[d.id] > 0 && openChatId !== d.id && (
+                                <span
+                                  className="absolute top-0 right-0 -mt-1 -mr-1 inline-flex items-center justify-center
+                                            px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full"
+                                  aria-label={`${unreadCounts[d.id]} رسالة غير مقروءة`}
+                                >
+                                  {unreadCounts[d.id]}
+                                </span>
+                              )}
+                            </button>
+        
+                            {/* صندوق الشات */}
+                            {openChatId === d.id && (
+                              <div id={`chatbox-${d.id}`} className="mt-2">
+                                <ChatBox
+                                  deviceId={d.id}
+                                  currentUser={currentUserRole === "admin" ? "admin" : currentUser}
+                                  currentUserDepartment={currentDepartment}
+                                />
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))
                     )}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+                  </tbody>
+                </table>
       </main>
     </div>
   );
