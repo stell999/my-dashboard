@@ -387,11 +387,12 @@ export default function DepartmentPage() {
           />
         </div>
 
-        <h1 className="text-2xl font-bold mb-6">
-          {currentUserRole === "admin"
-            ? "لوحة الصيانة (مشرف)"
-            : `قسم ${currentDepartment}`}
-        </h1>
+<h1 className="text-2xl font-bold mb-6 text-white">
+  {currentUserRole === "admin"
+    ? "لوحة الصيانة (مشرف)"
+    : `قسم ${currentDepartment}`}
+</h1>
+
         {currentUserRole === "admin" && (
           <>
             <button
@@ -464,7 +465,7 @@ export default function DepartmentPage() {
                 className="flex justify-between items-center bg-blue-800 rounded-lg px-4 py-2 shadow-sm hover:bg-blue-700 transition"
               >
                 <span className="truncate">{status}</span>
-                <span className="bg-black text-blue-900 text-xs font-semibold px-3 py-1 rounded-full shadow">
+                <span className="bg-black text-white-900 text-xs font-semibold px-3 py-1 rounded-full shadow">
                   {count}
                 </span>
               </li>
@@ -581,7 +582,7 @@ export default function DepartmentPage() {
                               aria-expanded={openChatId === d.id}
                               aria-controls={`chatbox-${d.id}`}
                             >
-                              {openChatId === d.id ? "إغلاق الشات" : "فتح الشات"}
+                              {openChatId === d.id ? "إغلاق" : "فتح"}
         
                               {/* عداد الرسائل غير المقروءة */}
                               {unreadCounts[d.id] > 0 && openChatId !== d.id && (
@@ -596,21 +597,24 @@ export default function DepartmentPage() {
                             </button>
         
                             {/* صندوق الشات */}
-                            {openChatId === d.id && (
-                              <div id={`chatbox-${d.id}`} className="mt-2">
-                                <ChatBox
-                                  deviceId={d.id}
-                                  currentUser={currentUserRole === "admin" ? "admin" : currentUser}
-                                  currentUserDepartment={currentDepartment}
-                                />
-                              </div>
-                            )}
+
                           </td>
                         </tr>
                       ))
                     )}
                   </tbody>
                 </table>
+{/* عرض صندوق الشات خارج الجدول */}
+{openChatId && (
+  <div className="mt-4 p-4 bg-white rounded shadow max-w-4xl mx-auto">
+    <ChatBox
+      deviceId={openChatId}
+      currentUser={currentUserRole === "admin" ? "admin" : currentUser}
+      currentUserDepartment={currentDepartment}
+    />
+  </div>
+)}
+
       </main>
     </div>
   );

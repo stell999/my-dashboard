@@ -1,19 +1,19 @@
 'use client';
 
+import * as XLSX from 'xlsx';
 import { useEffect, useState, useRef } from "react";
 import { supabase } from "../lib/supabaseClient";
-
 import Sidebar from "../components/Sidebar";
 import Header from "../components/Header";
 import Filters from "../components/Filters";
 import SearchBox from "../components/SearchBox";
 import DeviceForm from "../components/DeviceForm";
+import DeliveredDevicesControls from '../components/DeliveredDevicesControls'; // عدل المسار حسب مكان المكون
 
 import { STATUS_OPTIONS, PRIORITY_OPTIONS, DEPARTMENTS } from "../lib/constants";
 import { getPriorityColorClass } from "../lib/helpers";
 
 import BackupButton from './backup/backup';
-
 
 const initialFormData = {
   customerName: "",
@@ -36,6 +36,14 @@ function ChatBox({ deviceId, currentUser, currentUserDepartment, onReadMessages 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deviceId]);
 
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
   async function fetchMessages() {
     let query = supabase.from("device_notes").select("*").eq("device_id", deviceId);
 
@@ -50,7 +58,6 @@ function ChatBox({ deviceId, currentUser, currentUserDepartment, onReadMessages 
       setMessages([]);
     } else {
       setMessages(data || []);
-      scrollToBottom();
       await markMessagesAsRead(data);
     }
   }
@@ -71,27 +78,23 @@ function ChatBox({ deviceId, currentUser, currentUserDepartment, onReadMessages 
   }
 
   async function sendMessage() {
-    if (!newMessage.trim()) return;
+    const trimmed = newMessage.trim();
+    if (!trimmed) return;
 
     const senderName = currentUser === "admin" ? "admin" : currentUserDepartment;
-
-    if (!senderName) {
-      alert("غير مسموح لك بإرسال رسالة في هذا الشات");
-      return;
-    }
 
     const { error } = await supabase.from("device_notes").insert([
       {
         device_id: deviceId,
         sender: senderName,
-        message: newMessage.trim(),
+        message: trimmed,
         created_at: new Date().toISOString(),
         read_by: [senderName],
       },
     ]);
 
     if (error) {
-      alert("خطأ في إرسال الرسالة");
+      alert("حدث خطأ أثناء إرسال الرسالة.");
       return;
     }
 
@@ -99,55 +102,62 @@ function ChatBox({ deviceId, currentUser, currentUserDepartment, onReadMessages 
     fetchMessages();
   }
 
-  function scrollToBottom() {
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, 100);
-  }
-
   return (
-    <div className="border rounded p-3 bg-white shadow mt-2 max-h-60 overflow-y-auto">
-      <div className="mb-2 font-bold text-right">
-        محادثة الجهاز #{deviceId} {currentUser !== "admin" && `(قسم: ${currentUserDepartment})`}
+    <div className="absolute z-50 left-0 top-full mt-2 w-72 max-h-80 bg-white border border-gray-300 rounded-lg shadow-lg p-3 text-sm flex flex-col">
+      <div className="font-bold mb-2 text-right text-blue-800">
+        🛠️ الجهاز #{deviceId}{" "}
+        {currentUser !== "admin" && <span>({currentUserDepartment})</span>}
       </div>
-      <div className="space-y-2">
+
+      <div className="flex-1 overflow-y-auto space-y-2 pr-1">
         {messages.length === 0 ? (
           <div className="text-center text-gray-500">لا توجد رسائل بعد</div>
         ) : (
-          messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`p-2 rounded ${
-                msg.sender === (currentUser === "admin" ? "admin" : currentUserDepartment)
-                  ? "bg-blue-200 text-right"
-                  : "bg-gray-200 text-left"
-              }`}
-            >
-              <div className="text-xs text-gray-600">{msg.sender}</div>
-              <div>{msg.message}</div>
-              <div className="text-xs text-gray-500">{new Date(msg.created_at).toLocaleString()}</div>
-            </div>
-          ))
+          messages.map((msg) => {
+            const isMine =
+              msg.sender === (currentUser === "admin" ? "admin" : currentUserDepartment);
+            return (
+              <div
+                key={msg.id}
+                className={`p-2 rounded-lg text-xs max-w-[90%] ${
+                  isMine
+                    ? "bg-blue-100 self-end text-right"
+                    : "bg-gray-100 self-start text-left"
+                }`}
+              >
+                <div className="text-[10px] text-gray-500">{msg.sender}</div>
+                <div>{msg.message}</div>
+                <div className="text-[10px] text-gray-400">
+                  {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
+              </div>
+            );
+          })
         )}
         <div ref={messagesEndRef} />
       </div>
-      <div className="mt-2 flex gap-2">
+
+      <div className="flex gap-2 pt-2">
         <input
           type="text"
-          placeholder="اكتب رسالة..."
-          className="flex-grow border rounded p-2"
+          placeholder="اكتب رسالتك..."
+          className="flex-grow border rounded px-2 py-1 text-xs"
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-          aria-label="نص الرسالة"
         />
-        <button onClick={sendMessage} className="bg-blue-600 text-white px-4 rounded" aria-label="إرسال رسالة">
+        <button
+          onClick={sendMessage}
+          className="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 transition"
+        >
           إرسال
         </button>
       </div>
     </div>
   );
 }
+
+
 
 // --- مكون الجدول ---
 function DeviceTable({
@@ -166,7 +176,7 @@ function DeviceTable({
 
   return (
     <div className="overflow-x-auto bg-white rounded shadow max-w-full">
-      <table className="min-w-full text-right">
+      <table className="min-w-[1100px] whitespace-nowrap">
         <thead className="bg-gray-200">
           <tr>
             <th className="p-2">#</th>
@@ -262,7 +272,7 @@ function DeviceTable({
                   onClick={() => toggleChat(device.id)}
                   className="bg-blue-600 text-white px-3 py-1 rounded flex items-center gap-2"
                 >
-                  {openChatId === device.id ? "إخفاء المحادثة" : "عرض المحادثة"}
+                  {openChatId === device.id ? "إخفاء" : "عرض"}
                   {device.unreadCount > 0 && (
                     <span className="inline-block w-5 h-5 text-xs font-bold bg-red-600 text-white rounded-full text-center">
                       {device.unreadCount}
@@ -297,7 +307,7 @@ export default function Page() {
   const [dateFilter, setDateFilter] = useState("");
   const [formData, setFormData] = useState(initialFormData);
   const [openChatId, setOpenChatId] = useState(null);
-const [employeeFilter, setEmployeeFilter] = useState(""); // هنا يتم تعريف الفلتر
+  const [employeeFilter, setEmployeeFilter] = useState(""); // هنا يتم تعريف الفلتر
 
   const customerRef = useRef(null);
   const deviceRef = useRef(null);
@@ -309,11 +319,21 @@ const [employeeFilter, setEmployeeFilter] = useState(""); // هنا يتم تع�
 
   const currentUser = "admin"; // أو غيّر حسب المستخدم الحالي
 
+  const [archivedDevices, setArchivedDevices] = useState([]);
+const [showArchive, setShowArchive] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   useEffect(() => {
     fetchEmployees();
     fetchDevicesWithUnread();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  useEffect(() => {
+  if (showArchive) {
+    fetchArchivedDevices();
+  }
+}, [searchTerm, showArchive]);
+
 
   useEffect(() => {
     localStorage.setItem("showForm", showForm.toString());
@@ -360,9 +380,6 @@ async function fetchDevicesWithUnread() {
     setDevices([]);
   }
 }
-
-  
-
   async function fetchEmployees() {
     try {
       const { data, error } = await supabase
@@ -444,6 +461,7 @@ async function fetchDevicesWithUnread() {
     }
   }
 
+
   // التعديل الأساسي: تحديث delivery_date و delivery_time فقط عند الحالة "تم التسليم"
 async function handleChangeStatus(id, newStatus) {
   try {
@@ -498,28 +516,40 @@ async function handleChangeStatus(id, newStatus) {
   }
 
   async function handleChangeDepartment(id, newDepartment) {
-    try {
-      const { error } = await supabase
-        .from("devices")
-        .update({ department: newDepartment })
-        .eq("id", id);
 
-      if (error) throw error;
+      try {
+        const { error } = await supabase
+          .from("devices")
+          .update({ department: newDepartment })
+          .eq("id", id);
 
-      setDevices((prev) =>
-        prev.map((d) => (d.id === id ? { ...d, department: newDepartment } : d))
-      );
-    } catch (error) {
-      console.error("فشل تحديث القسم:", error);
-      alert("حدث خطأ أثناء تحديث القسم");
-    }
+        if (error) throw error;
+
+        setDevices((prev) =>
+          prev.map((d) => (d.id === id ? { ...d, department: newDepartment } : d))
+        );
+      } catch (error) {
+        console.error("فشل تحديث القسم:", error);
+        alert("حدث خطأ أثناء تحديث القسم");
+      }
   }
 
+
+
 const filteredDevices = devices
-  .filter((d) => d.customerName?.toLowerCase().includes(searchTerm.toLowerCase()))
+  .filter((d) =>
+    d.customerName?.toLowerCase().includes(searchTerm.toLowerCase())
+  )
   .filter((d) => statusFilter === "الكل" || d.status === statusFilter)
   .filter((d) => !dateFilter || d.date === dateFilter)
-  .filter((d) => employeeFilter === "الكل" || !employeeFilter || d.employeeName === employeeFilter);
+  .filter(
+    (d) =>
+      employeeFilter === "الكل" || !employeeFilter || d.employeeName === employeeFilter
+  );
+
+const filteredArchivedDevices = archivedDevices.filter((d) =>
+  d.customerName?.toLowerCase().includes(searchTerm.toLowerCase())
+);
 
   function toggleChat(deviceId) {
     setOpenChatId((prev) => (prev === deviceId ? null : deviceId));
@@ -556,18 +586,73 @@ const filteredDevices = devices
 
   return (
     <div dir="rtl" lang="ar" className="min-h-screen bg-gray-100 flex">
-      <Sidebar devices={devices} />
+            <button
+        onClick={() => setSidebarOpen(v => !v)}
+        className="fixed top-4 right-4 z-50 bg-blue-600 text-white px-4 py-2 rounded shadow"
+      >
+        {sidebarOpen ? "إخفاء القائمة" : "عرض القائمة"}
+      </button>
+      <Sidebar devices={devices} isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)} />
       <main className="flex-1 p-6">
         <Header showForm={showForm} setShowForm={setShowForm} customerRef={customerRef} />
         <Filters
         
-  dateFilter={dateFilter}
-  setDateFilter={setDateFilter}
-  statusFilter={statusFilter}
-  setStatusFilter={setStatusFilter}
-  employeeFilter={employeeFilter}
-  setEmployeeFilter={setEmployeeFilter}
-/>
+        dateFilter={dateFilter}
+        setDateFilter={setDateFilter}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
+        employeeFilter={employeeFilter}
+        setEmployeeFilter={setEmployeeFilter}
+      />
+{showArchive && (
+  <div className="mt-6 bg-white rounded shadow p-4 max-h-96 overflow-y-auto">
+    <h2 className="text-lg font-bold mb-3">بيانات الأرشيف</h2>
+    {archivedDevices.length === 0 ? (
+      <p>لا توجد بيانات في الأرشيف.</p>
+    ) : (
+      <table className="min-w-full text-right text-sm">
+        <thead className="bg-gray-200">
+          <tr>
+            <th className="p-2">#</th>
+            <th className="p-2">اسم الزبون</th>
+            <th className="p-2">اسم الجهاز</th>
+            <th className="p-2">التاريخ</th>
+            <th className="p-2">الوقت</th>
+            <th className="p-2">العطل</th>
+            <th className="p-2">القسم</th>
+            <th className="p-2">الموظف</th>
+            <th className="p-2">الحالة</th>
+            <th className="p-2">الأولوية</th>
+          </tr>
+        </thead>
+        <tbody>
+          {archivedDevices.map((device, i) => (
+            <tr key={device.id} className="border-t">
+              <td className="p-2">{i + 1}</td>
+              <td className="p-2">{device.customerName}</td>
+              <td className="p-2">{device.deviceName}</td>
+              <td className="p-2">{device.date || "-"}</td>
+              <td className="p-2">{device.time || "-"}</td>
+              <td className="p-2">{device.issue}</td>
+              <td className="p-2">{device.department}</td>
+              <td className="p-2">{device.employeeName}</td>
+              <td className="p-2">{device.status}</td>
+              <td className="p-2">{device.priorityColor}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )}
+  </div>
+)}
+{/* <button
+  onClick={archiveDeliveredDevices}
+  className="mb-4 bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700"
+>
+  ترحيل الأجهزة التي تم تسليمها إلى الأرشيف
+</button> */}
+      <DeliveredDevicesControls />
         <SearchBox searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
         {showForm && (
           <DeviceForm
@@ -594,5 +679,7 @@ const filteredDevices = devices
         <BackupButton/>
       </main>
     </div>
+
   );
+  
 }
