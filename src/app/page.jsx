@@ -320,66 +320,65 @@ export default function Page() {
   const currentUser = "admin"; // أو غيّر حسب المستخدم الحالي
 
   const [archivedDevices, setArchivedDevices] = useState([]);
-const [showArchive, setShowArchive] = useState(false);
+  const [showArchive, setShowArchive] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  useEffect(() => {
-    fetchEmployees();
-    fetchDevicesWithUnread();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  useEffect(() => {
-  if (showArchive) {
-    fetchArchivedDevices();
-  }
-}, [searchTerm, showArchive]);
+    useEffect(() => {
+        fetchEmployees();
+        fetchDevicesWithUnread();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+    useEffect(() => {
+      if (showArchive) {
+        fetchArchivedDevices();
+      }
+    }, [searchTerm, showArchive]);
 
+    useEffect(() => {
+      localStorage.setItem("showForm", showForm.toString());
+    }, [showForm]);
 
-  useEffect(() => {
-    localStorage.setItem("showForm", showForm.toString());
-  }, [showForm]);
+    useEffect(() => {
+      localStorage.setItem("searchTerm", searchTerm);
+    }, [searchTerm]);
 
-  useEffect(() => {
-    localStorage.setItem("searchTerm", searchTerm);
-  }, [searchTerm]);
+  async function fetchDevicesWithUnread() {
+    try {
+      const { data: devicesData, error: devicesError } = await supabase.from("devices").select("*");
+      if (devicesError) throw devicesError;
 
-async function fetchDevicesWithUnread() {
-  try {
-    const { data: devicesData, error: devicesError } = await supabase.from("devices").select("*");
-    if (devicesError) throw devicesError;
+      const { data: unreadMessages, error: unreadError } = await supabase
+        .from("device_notes")
+        .select("device_id")
+        .not("read_by", "cs", `{${currentUser}}`);
 
-    const { data: unreadMessages, error: unreadError } = await supabase
-      .from("device_notes")
-      .select("device_id")
-      .not("read_by", "cs", `{${currentUser}}`);
+      if (unreadError) throw unreadError;
 
-    if (unreadError) throw unreadError;
-
-    const unreadCountMap = {};
-    unreadMessages.forEach((msg) => {
-      unreadCountMap[msg.device_id] = (unreadCountMap[msg.device_id] || 0) + 1;
-    });
-
-    // فرز الأجهزة بحيث الأحدث (حسب التاريخ والوقت) تظهر أولاً
-    const devicesWithUnread = devicesData
-      .map((device) => ({
-        ...device,
-        unreadCount: unreadCountMap[device.id] || 0,
-      }))
-      .sort((a, b) => {
-        // نرتب حسب التاريخ أولاً (نصّف الـ ISO string)
-        if (a.date === b.date) {
-          return b.time.localeCompare(a.time); // الوقت الأحدث أولاً
-        }
-        return b.date.localeCompare(a.date); // التاريخ الأحدث أولاً
+      const unreadCountMap = {};
+      unreadMessages.forEach((msg) => {
+        unreadCountMap[msg.device_id] = (unreadCountMap[msg.device_id] || 0) + 1;
       });
 
-    setDevices(devicesWithUnread);
-  } catch (error) {
-    console.error("خطأ في تحميل الأجهزة مع عدد الرسائل غير المقروءة:", error);
-    setDevices([]);
+      // فرز الأجهزة بحيث الأحدث (حسب التاريخ والوقت) تظهر أولاً
+      const devicesWithUnread = devicesData
+        .map((device) => ({
+          ...device,
+          unreadCount: unreadCountMap[device.id] || 0,
+        }))
+        .sort((a, b) => {
+          // نرتب حسب التاريخ أولاً (نصّف الـ ISO string)
+          if (a.date === b.date) {
+            return b.time.localeCompare(a.time); // الوقت الأحدث أولاً
+          }
+          return b.date.localeCompare(a.date); // التاريخ الأحدث أولاً
+        });
+
+      setDevices(devicesWithUnread);
+    } catch (error) {
+      console.error("خطأ في تحميل الأجهزة مع عدد الرسائل غير المقروءة:", error);
+      setDevices([]);
+    }
   }
-}
   async function fetchEmployees() {
     try {
       const { data, error } = await supabase
@@ -460,35 +459,33 @@ async function fetchDevicesWithUnread() {
       alert("حدث خطأ أثناء الحذف");
     }
   }
+    // التعديل الأساسي: تحديث delivery_date و delivery_time فقط عند الحالة "تم التسليم"
+  async function handleChangeStatus(id, newStatus) {
+    try {
+      const updateData = { status: newStatus };
 
+      if (newStatus === "تم التسليم") {
+        const now = new Date();
+        updateData.delivery_date = now.toISOString().split("T")[0];
+        updateData.delivery_time = now.toTimeString().split(" ")[0];  // << هنا الصيغة الصحيحة للعمود time
+      } else {
+        updateData.delivery_date = null;
+        updateData.delivery_time = null;
+      }
 
-  // التعديل الأساسي: تحديث delivery_date و delivery_time فقط عند الحالة "تم التسليم"
-async function handleChangeStatus(id, newStatus) {
-  try {
-    const updateData = { status: newStatus };
+      const { error } = await supabase
+        .from("devices")
+        .update(updateData)
+        .eq("id", id);
 
-    if (newStatus === "تم التسليم") {
-      const now = new Date();
-      updateData.delivery_date = now.toISOString().split("T")[0];
-      updateData.delivery_time = now.toTimeString().split(" ")[0];  // << هنا الصيغة الصحيحة للعمود time
-    } else {
-      updateData.delivery_date = null;
-      updateData.delivery_time = null;
+      if (error) throw error;
+
+      await fetchDevicesWithUnread();
+    } catch (error) {
+      console.error("فشل تحديث الحالة:", error);
+      alert("حدث خطأ أثناء تحديث الحالة: " + (error.message || error));
     }
-
-    const { error } = await supabase
-      .from("devices")
-      .update(updateData)
-      .eq("id", id);
-
-    if (error) throw error;
-
-    await fetchDevicesWithUnread();
-  } catch (error) {
-    console.error("فشل تحديث الحالة:", error);
-    alert("حدث خطأ أثناء تحديث الحالة: " + (error.message || error));
   }
-}
 
   async function handleChangeEmployee(id, newEmployee) {
     try {
@@ -547,9 +544,9 @@ const filteredDevices = devices
       employeeFilter === "الكل" || !employeeFilter || d.employeeName === employeeFilter
   );
 
-const filteredArchivedDevices = archivedDevices.filter((d) =>
-  d.customerName?.toLowerCase().includes(searchTerm.toLowerCase())
-);
+  const filteredArchivedDevices = archivedDevices.filter((d) =>
+    d.customerName?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   function toggleChat(deviceId) {
     setOpenChatId((prev) => (prev === deviceId ? null : deviceId));
@@ -681,5 +678,4 @@ const filteredArchivedDevices = archivedDevices.filter((d) =>
     </div>
 
   );
-  
 }

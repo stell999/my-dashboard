@@ -85,8 +85,19 @@ export default function Sidebar({ devices = [], isOpen, onClose }) {
               إدارة الموظفين
             </Link>
           </li>
+
+          {/* ✅ زر أرشيف الأجهزة */}
+          <li>
+            <Link
+              href="/delivered-devices"
+              className="block px-3 py-2 rounded-md bg-green-600 hover:bg-green-700 transition"
+            >
+              📦 أرشيف الأجهزة المسلمة
+            </Link>
+          </li>
         </ul>
       </nav>
+
 
       <div className="mt-5">
         <h2 className="text-lg font-semibold mb-3 text-blue-200 border-b border-blue-700 pb-1">

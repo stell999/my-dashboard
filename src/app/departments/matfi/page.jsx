@@ -4,18 +4,6 @@ import { useEffect, useState, useRef } from "react";
 import { supabase } from "../../../lib/supabaseClient";
 import { useRouter } from "next/navigation";
 import { STATUS_OPTIONS } from "../../../lib/constants";
-
-// const STATUS_OPTIONS = [
-//   "جاري العمل",
-//   "تم الإصلاح",
-//   "تم التسليم",
-//   "لا يصلح",
-//   "انتظار",
-//   "زبون مابدو",
-//   "صلح",
-//   "مرتجع"
-// ];
-
 const DEPARTMENTS = [
   "مطفي",
   "شاشات",
