@@ -13,18 +13,25 @@ export default function DeliveredDevicesArchive() {
   const [storageStatus, setStorageStatus] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('');
   const [dateFilter, setDateFilter] = useState('');
+  const [devicesCount, setDevicesCount] = useState(0);
   const router = useRouter();
 
-  // دالة تحميل البيانات من Supabase
-  const fetchDevices = useCallback(async () => {
+  // دالة تحميل الأجهزة من Supabase مع البحث والفلترة
+  const fetchDevices = useCallback(async (search = '', department = '', date = '') => {
     try {
       setLoading(true);
       setStorageStatus('جاري تحميل البيانات...');
-      const { data, error } = await supabase
+
+      let query = supabase
         .from('archived_devices')
         .select('*')
         .order('delivery_date', { ascending: false });
 
+      if (search) query = query.ilike('customerName', `%${search}%`);
+      if (department) query = query.eq('department', department);
+      if (date) query = query.eq('delivery_date', date);
+
+      const { data, error } = await query;
       if (error) throw error;
 
       setDevices(data || []);
@@ -38,37 +45,45 @@ export default function DeliveredDevicesArchive() {
     }
   }, []);
 
-  // تحميل البيانات أول مرة والتحديث اليدوي
+  // دالة لجلب عدد الأجهزة حسب نفس شروط البحث والفلترة
+  const fetchDevicesCount = useCallback(async (search = '', department = '', date = '') => {
+    try {
+      let query = supabase
+        .from('archived_devices')
+        .select('id', { count: 'exact', head: true }); // فقط العد بدون البيانات
+
+      if (search) query = query.ilike('customerName', `%${search}%`);
+      if (department) query = query.eq('department', department);
+      if (date) query = query.eq('delivery_date', date);
+
+      const { count, error } = await query;
+      if (error) throw error;
+
+      setDevicesCount(count || 0);
+    } catch (error) {
+      console.error('خطأ في جلب عدد الأجهزة:', error);
+      setDevicesCount(0);
+    }
+  }, []);
+
+  // استدعاء الدالتين عند تغير البحث أو الفلترة
   useEffect(() => {
-    fetchDevices();
-  }, [fetchDevices]);
+    fetchDevices(searchTerm, selectedDepartment, dateFilter);
+    fetchDevicesCount(searchTerm, selectedDepartment, dateFilter);
+  }, [searchTerm, selectedDepartment, dateFilter, fetchDevices, fetchDevicesCount]);
 
   // تصدير البيانات إلى Excel
   const exportToExcel = () => {
-    if (filteredDevices.length === 0) {
+    if (devices.length === 0) {
       alert('لا توجد بيانات للتصدير');
       return;
     }
 
-    const worksheet = XLSX.utils.json_to_sheet(filteredDevices);
+    const worksheet = XLSX.utils.json_to_sheet(devices);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'الأرشيف');
     XLSX.writeFile(workbook, `devices_archive_${new Date().toISOString().split('T')[0]}.xls`, { bookType: 'xls' });
   };
-
-  // فلترة البيانات بناءً على البحث، القسم والتاريخ
-  const filteredDevices = devices.filter(device => {
-    const matchesSearch = device.customerName?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesDepartment = selectedDepartment ? device.department === selectedDepartment : true;
-
-    let matchesDate = true;
-    if (dateFilter) {
-      const deviceDate = new Date(device.delivery_date).toISOString().split('T')[0];
-      matchesDate = deviceDate === dateFilter;
-    }
-
-    return matchesSearch && matchesDepartment && matchesDate;
-  });
 
   if (loading) return (
     <div style={{ padding: '20px', textAlign: 'center' }}>
@@ -105,7 +120,10 @@ export default function DeliveredDevicesArchive() {
 
         <div>
           <button 
-            onClick={fetchDevices}
+            onClick={() => {
+              fetchDevices(searchTerm, selectedDepartment, dateFilter);
+              fetchDevicesCount(searchTerm, selectedDepartment, dateFilter);
+            }}
             style={{ 
               padding: '10px', 
               backgroundColor: '#4CAF50',
@@ -121,35 +139,33 @@ export default function DeliveredDevicesArchive() {
         </div>
       </div>
 
-      {/* إحصائية عدد الأجهزة */}
-<h2
-  style={{
-    marginBottom: '15px',
-    fontSize: '1.5rem',
-    fontWeight: '600',
-    textShadow: '1px 1px 2px rgba(0,0,0,0.1)',
-    background: 'linear-gradient(90deg, #000000, #555555)', // من أسود غامق لرمادي متوسط
-    WebkitBackgroundClip: 'text',
-    WebkitTextFillColor: 'transparent',
-  }}
->
-  إجمالي الأجهزة المعروضة: <strong>{filteredDevices.length}</strong>
-</h2>
+      {/* إحصائية عدد الأجهزة من قاعدة البيانات */}
+      <h2
+        style={{
+          marginBottom: '15px',
+          fontSize: '1.5rem',
+          fontWeight: '600',
+          textShadow: '1px 1px 2px rgba(0,0,0,0.1)',
+          background: 'linear-gradient(90deg, #000000, #555555)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+        }}
+      >
+        إجمالي الأجهزة المعروضة: <strong>{devicesCount}</strong>
+      </h2>
 
-
-
-<h1
-  style={{
-    fontSize: '2.5rem',
-    fontWeight: '700',
-    color: '#34495e',
-    marginBottom: '30px',
-    textAlign: 'center',
-    textShadow: '2px 2px 5px rgba(0,0,0,0.1)',
-  }}
->
-  📦 الأرشيف الدائم للأجهزة المسلمة
-</h1>
+      <h1
+        style={{
+          fontSize: '2.5rem',
+          fontWeight: '700',
+          color: '#34495e',
+          marginBottom: '30px',
+          textAlign: 'center',
+          textShadow: '2px 2px 5px rgba(0,0,0,0.1)',
+        }}
+      >
+        📦 الأرشيف الدائم للأجهزة المسلمة
+      </h1>
 
       <div style={{ display: 'flex', gap: '15px', marginBottom: '20px', flexWrap: 'wrap' }}>
         <SearchBox searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
@@ -211,47 +227,45 @@ export default function DeliveredDevicesArchive() {
         </div>
       </div>
 
-      {filteredDevices.length === 0 ? (
+      {devices.length === 0 ? (
         <p style={{ textAlign: 'center', marginTop: '20px' }}>
           {searchTerm || selectedDepartment || dateFilter 
             ? 'لا توجد نتائج مطابقة للبحث' 
             : 'لا توجد أجهزة في الأرشيف'}
         </p>
       ) : (
-        <>
-          <div style={{ overflowX: 'auto', marginTop: '10px' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', boxShadow: '0 2px 3px rgba(0,0,0,0.1)' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#f8f9fa', position: 'sticky', top: 0 }}>
-                  {[
-                    'الزبون', 'الجهاز', 'المشكلة', 'تاريخ الاستلام', 
-                    'وقت الاستلام', 'القسم', 'اسم الموظف',
-                    'تاريخ التسليم', 'وقت التسليم'
-                  ].map((header, i) => (
-                    <th key={i} style={{ padding: '12px 15px', borderBottom: '1px solid #ddd', textAlign: 'right' }}>
-                      {header}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredDevices.map((device) => (
-                  <tr key={device.id} style={{ backgroundColor: '#fff', borderBottom: '1px solid #eee' }}>
-                    <td style={{ padding: '12px 15px' }}>{device.customerName}</td>
-                    <td style={{ padding: '12px 15px' }}>{device.deviceName}</td>
-                    <td style={{ padding: '12px 15px' }}>{device.issue}</td>
-                    <td style={{ padding: '12px 15px' }}>{device.date ? new Date(device.date).toLocaleDateString() : ''}</td>
-                    <td style={{ padding: '12px 15px' }}>{device.time}</td>
-                    <td style={{ padding: '12px 15px' }}>{device.department}</td>
-                    <td style={{ padding: '12px 15px' }}>{device.employeeName}</td>
-                    <td style={{ padding: '12px 15px' }}>{device.delivery_date ? new Date(device.delivery_date).toLocaleDateString() : ''}</td>
-                    <td style={{ padding: '12px 15px' }}>{device.delivery_time}</td>
-                  </tr>
+        <div style={{ overflowX: 'auto', marginTop: '10px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', boxShadow: '0 2px 3px rgba(0,0,0,0.1)' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#f8f9fa', position: 'sticky', top: 0 }}>
+                {[
+                  'الزبون', 'الجهاز', 'المشكلة', 'تاريخ الاستلام', 
+                  'وقت الاستلام', 'القسم', 'اسم الموظف',
+                  'تاريخ التسليم', 'وقت التسليم'
+                ].map((header, i) => (
+                  <th key={i} style={{ padding: '12px 15px', borderBottom: '1px solid #ddd', textAlign: 'right' }}>
+                    {header}
+                  </th>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        </>
+              </tr>
+            </thead>
+            <tbody>
+              {devices.map((device) => (
+                <tr key={device.id} style={{ backgroundColor: '#fff', borderBottom: '1px solid #eee' }}>
+                  <td style={{ padding: '12px 15px' }}>{device.customerName}</td>
+                  <td style={{ padding: '12px 15px' }}>{device.deviceName}</td>
+                  <td style={{ padding: '12px 15px' }}>{device.issue}</td>
+                  <td style={{ padding: '12px 15px' }}>{device.date ? new Date(device.date).toLocaleDateString() : ''}</td>
+                  <td style={{ padding: '12px 15px' }}>{device.time}</td>
+                  <td style={{ padding: '12px 15px' }}>{device.department}</td>
+                  <td style={{ padding: '12px 15px' }}>{device.employeeName}</td>
+                  <td style={{ padding: '12px 15px' }}>{device.delivery_date ? new Date(device.delivery_date).toLocaleDateString() : ''}</td>
+                  <td style={{ padding: '12px 15px' }}>{device.delivery_time}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
