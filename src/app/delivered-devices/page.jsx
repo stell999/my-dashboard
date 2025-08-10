@@ -3,15 +3,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 import SearchBox from '../../components/SearchBox';
-
-export const DEPARTMENTS = [
-  { value: "", label: "الكل" },
-  { value: "مطفي", label: "مطفي" },
-  { value: "شاشات", label: "شاشات" },
-  { value: "سوفت وير", label: "سوفت وير" },
-  { value: "معالجات", label: "معالجات" },
-  { value: "أعطال خفيفة", label: "أعطال خفيفة" }
-];
+import { DEPARTMENTS } from '../../lib/constants';
 
 export default function DeliveredDevicesArchive() {
   const [localDevices, setLocalDevices] = useState([]);
