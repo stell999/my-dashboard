@@ -439,6 +439,63 @@ export default function Page() {
       setEmployees([]);
     }
   }
+async function archiveDeliveredDevices() {
+  try {
+    const { data: deliveredDevices, error: fetchError } = await supabase
+      .from('devices')
+      .select('*')
+      .eq('status', 'تم التسليم');
+
+    if (fetchError) throw fetchError;
+    if (!deliveredDevices || deliveredDevices.length === 0) {
+      alert('لا توجد أجهزة بحالة "تم التسليم" لترحيلها.');
+      return;
+    }
+
+    const { error: insertError } = await supabase
+      .from('archived_devices')
+      .insert(deliveredDevices);
+
+    if (insertError) throw insertError;
+
+    const idsToDelete = deliveredDevices.map(device => device.id);
+
+    const { error: deleteError } = await supabase
+      .from('devices')
+      .delete()
+      .in('id', idsToDelete);
+
+    if (deleteError) throw deleteError;
+
+    alert(`تم ترحيل ${deliveredDevices.length} جهازًا بنجاح إلى الأرشيف.`);
+    fetchDevicesWithUnread();
+
+    // استدعاء fetchArchivedDevices فقط إذا عرّفتها
+    if (typeof fetchArchivedDevices === 'function') {
+      fetchArchivedDevices();
+    }
+  } catch (error) {
+    console.error('خطأ في ترحيل الأجهزة:', error);
+    alert('حدث خطأ أثناء ترحيل الأجهزة.');
+  }
+}
+
+    async function fetchArchivedDevices() {
+    try {
+      const { data, error } = await supabase
+        .from('archived_devices')
+        .select('*')
+        .order('delivery_date', { ascending: false });
+
+      if (error) throw error;
+      setArchivedDevices(data || []);
+    } catch (error) {
+      console.error("خطأ في تحميل الأرشيف:", error);
+      setArchivedDevices([]);
+    }
+  }
+
+
 
   function handleInputChange(e) {
     const { name, value } = e.target;
@@ -495,7 +552,7 @@ export default function Page() {
       alert("حدث خطأ أثناء الحذف");
     }
   }
-    // التعديل الأساسي: تحديث delivery_date و delivery_time فقط عند الحالة "تم التسليم"
+
   async function handleChangeStatus(id, newStatus) {
     try {
       const updateData = { status: newStatus };
@@ -629,58 +686,63 @@ const filteredDevices = devices
         onClose={() => setSidebarOpen(false)} />
       <main className="flex-1 p-6">
         <Header showForm={showForm} setShowForm={setShowForm} customerRef={customerRef} />
+                                <button onClick={archiveDeliveredDevices} style={{ backgroundColor: '#4CAF50', color: 'white', padding: '10px', borderRadius: '5px', cursor: 'pointer' }}>
+  ترحيل الأجهزة التي تم تسليمها
+</button>
         <Filters
         
-        dateFilter={dateFilter}
-        setDateFilter={setDateFilter}
-        statusFilter={statusFilter}
-        setStatusFilter={setStatusFilter}
-        employeeFilter={employeeFilter}
-        setEmployeeFilter={setEmployeeFilter}
-      />
-{showArchive && (
-  <div className="mt-6 bg-white rounded shadow p-4 max-h-96 overflow-y-auto">
-    <h2 className="text-lg font-bold mb-3">بيانات الأرشيف</h2>
-    {archivedDevices.length === 0 ? (
-      <p>لا توجد بيانات في الأرشيف.</p>
-    ) : (
-      <table className="min-w-full text-right text-sm">
-        <thead className="bg-gray-200">
-          <tr>
-            <th className="p-2">#</th>
-            <th className="p-2">اسم الزبون</th>
-            <th className="p-2">اسم الجهاز</th>
-            <th className="p-2">التاريخ</th>
-            <th className="p-2">الوقت</th>
-            <th className="p-2">العطل</th>
-            <th className="p-2">القسم</th>
-            <th className="p-2">الموظف</th>
-            <th className="p-2">الحالة</th>
-            <th className="p-2">الأولوية</th>
-          </tr>
-        </thead>
-        <tbody>
-          {archivedDevices.map((device, i) => (
-            <tr key={device.id} className="border-t">
-              <td className="p-2">{i + 1}</td>
-              <td className="p-2">{device.customerName}</td>
-              <td className="p-2">{device.deviceName}</td>
-              <td className="p-2">{device.date || "-"}</td>
-              <td className="p-2">{device.time || "-"}</td>
-              <td className="p-2">{device.issue}</td>
-              <td className="p-2">{device.department}</td>
-              <td className="p-2">{device.employeeName}</td>
-              <td className="p-2">{device.status}</td>
-              <td className="p-2">{device.priorityColor}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    )}
-  </div>
-)}
+                dateFilter={dateFilter}
+                setDateFilter={setDateFilter}
+                statusFilter={statusFilter}
+                setStatusFilter={setStatusFilter}
+                employeeFilter={employeeFilter}
+                setEmployeeFilter={setEmployeeFilter}
+              />
+        {showArchive && (
+          <div className="mt-6 bg-white rounded shadow p-4 max-h-96 overflow-y-auto">
+            <h2 className="text-lg font-bold mb-3">بيانات الأرشيف</h2>
+            {archivedDevices.length === 0 ? (
+              <p>لا توجد بيانات في الأرشيف.</p>
+            ) : (
+              <table className="min-w-full text-right text-sm">
+                <thead className="bg-gray-200">
+                  <tr>
+                    <th className="p-2">#</th>
+                    <th className="p-2">اسم الزبون</th>
+                    <th className="p-2">اسم الجهاز</th>
+                    <th className="p-2">التاريخ</th>
+                    <th className="p-2">الوقت</th>
+                    <th className="p-2">العطل</th>
+                    <th className="p-2">القسم</th>
+                    <th className="p-2">الموظف</th>
+                    <th className="p-2">الحالة</th>
+                    <th className="p-2">الأولوية</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {archivedDevices.map((device, i) => (
+                    <tr key={device.id} className="border-t">
+                      <td className="p-2">{i + 1}</td>
+                      <td className="p-2">{device.customerName}</td>
+                      <td className="p-2">{device.deviceName}</td>
+                      <td className="p-2">{device.date || "-"}</td>
+                      <td className="p-2">{device.time || "-"}</td>
+                      <td className="p-2">{device.issue}</td>
+                      <td className="p-2">{device.department}</td>
+                      <td className="p-2">{device.employeeName}</td>
+                      <td className="p-2">{device.status}</td>
+                      <td className="p-2">{device.priorityColor}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+
       <DeliveredDevicesControls />
         <SearchBox searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
+
         {showForm && (
           <DeviceForm
             formData={formData}
@@ -691,6 +753,7 @@ const filteredDevices = devices
             employees={employees}
           />
         )}
+
         <DeviceTable
           devices={filteredDevices}
           employees={employees}
