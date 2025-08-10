@@ -26,7 +26,22 @@
   .container {
     @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
   }
-
+  
+  td:nth-child(6),
+th:nth-child(6) {
+min-width: 100px !important;
+max-width: 140px !important;
+}
+  td:nth-child(8),
+th:nth-child(8) {
+min-width: 100px !important;
+max-width: 140px !important;
+}
+  td:nth-child(9),
+th:nth-child(9) {
+min-width: 110px !important;
+max-width: 160px !important;
+}
   input,
   textarea,
   select {

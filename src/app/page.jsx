@@ -27,21 +27,24 @@ const initialFormData = {
 
 // --- مكون الشات ---
 function ChatBox({ deviceId, currentUser, currentUserDepartment, onReadMessages }) {
+  const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const messagesEndRef = useRef(null);
+  const chatBoxRef = useRef(null);
 
   useEffect(() => {
-    if (deviceId) fetchMessages();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deviceId]);
+    if (deviceId && open) fetchMessages();
+  }, [deviceId, open]);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
   };
 
   async function fetchMessages() {
@@ -54,7 +57,7 @@ function ChatBox({ deviceId, currentUser, currentUserDepartment, onReadMessages 
     const { data, error } = await query.order("created_at", { ascending: true });
 
     if (error) {
-      console.error("خطأ في جلب رسائل الشات:", error);
+      console.error("خطأ في جلب الرسائل:", error);
       setMessages([]);
     } else {
       setMessages(data || []);
@@ -103,62 +106,92 @@ function ChatBox({ deviceId, currentUser, currentUserDepartment, onReadMessages 
   }
 
   return (
-    <div className="absolute z-50 left-0 top-full mt-2 w-72 max-h-80 bg-white border border-gray-300 rounded-lg shadow-lg p-3 text-sm flex flex-col">
-      <div className="font-bold mb-2 text-right text-blue-800">
-        🛠️ الجهاز #{deviceId}{" "}
-        {currentUser !== "admin" && <span>({currentUserDepartment})</span>}
-      </div>
+    <div>
+      {/* زر فتح الشات */}
+      <button
+        onClick={() => setOpen(true)}
+        className="fixed bottom-4 left-4 bg-blue-600 text-white px-5 py-3 rounded-lg font-semibold shadow-lg hover:bg-blue-700 transition z-50"
+      >
+        عرض الشات
+      </button>
 
-      <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-        {messages.length === 0 ? (
-          <div className="text-center text-gray-500">لا توجد رسائل بعد</div>
-        ) : (
-          messages.map((msg) => {
-            const isMine =
-              msg.sender === (currentUser === "admin" ? "admin" : currentUserDepartment);
-            return (
-              <div
-                key={msg.id}
-                className={`p-2 rounded-lg text-xs max-w-[90%] ${
-                  isMine
-                    ? "bg-blue-100 self-end text-right"
-                    : "bg-gray-100 self-start text-left"
-                }`}
-              >
-                <div className="text-[10px] text-gray-500">{msg.sender}</div>
-                <div>{msg.message}</div>
-                <div className="text-[10px] text-gray-400">
-                  {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </div>
-              </div>
-            );
-          })
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      <div className="flex gap-2 pt-2">
-        <input
-          type="text"
-          placeholder="اكتب رسالتك..."
-          className="flex-grow border rounded px-2 py-1 text-xs"
-          value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-        />
-        <button
-          onClick={sendMessage}
-          className="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 transition"
+      {/* مربع الشات */}
+      {open && (
+        <div
+          ref={chatBoxRef}
+          className="fixed bottom-16 left-4 w-80 max-h-[400px] bg-white border border-gray-300 rounded-lg shadow-lg flex flex-col text-sm z-50"
+          style={{ maxHeight: "400px" }}
         >
-          إرسال
-        </button>
-      </div>
+          {/* رأس الشات مع زر إغلاق */}
+          <div className="flex justify-between items-center bg-blue-600 text-white rounded-t-lg px-4 py-2 font-semibold select-none">
+            <button
+              onClick={() => setOpen(false)}
+              aria-label="إغلاق الشات"
+              className="hover:bg-blue-800 rounded px-2 py-1 transition"
+            >
+              ✕
+            </button>
+            <span className="flex-grow text-center">
+              🛠️ جهاز #{deviceId} {currentUser !== "admin" && `(${currentUserDepartment})`}
+            </span>
+            <div style={{ width: 32 }}></div>
+          </div>
+
+          {/* صندوق الرسائل */}
+          <div className="flex-1 overflow-y-auto p-3 space-y-3 scrollbar-thin scrollbar-thumb-blue-400 scrollbar-track-gray-100">
+            {messages.length === 0 ? (
+              <div className="text-center text-gray-400 italic">لا توجد رسائل بعد</div>
+            ) : (
+              messages.map((msg) => {
+                const isMine =
+                  msg.sender === (currentUser === "admin" ? "admin" : currentUserDepartment);
+                return (
+                  <div
+                    key={msg.id}
+                    className={`p-2 rounded-lg text-xs max-w-[85%] shadow-sm ${
+                      isMine ? "bg-blue-100 self-end text-right" : "bg-gray-100 self-start text-left"
+                    }`}
+                  >
+                    <div className="text-[10px] text-gray-600 font-semibold">{msg.sender}</div>
+                    <div className="mt-1 whitespace-pre-wrap break-words">{msg.message}</div>
+                    <div className="text-[9px] text-gray-400 mt-1">
+                      {new Date(msg.created_at).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* مربع إدخال الرسالة وزر الإرسال */}
+          <div className="flex gap-2 p-3 border-t border-gray-300">
+            <input
+              type="text"
+              placeholder="اكتب رسالتك..."
+              className="flex-grow border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+              autoComplete="off"
+              aria-label="نص الرسالة"
+            />
+            <button
+              onClick={sendMessage}
+              className="bg-blue-600 text-white px-5 rounded-md font-semibold hover:bg-blue-700 transition"
+              aria-label="إرسال رسالة"
+            >
+              إرسال
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-
-
-
 // --- مكون الجدول ---
 function DeviceTable({
   devices,
@@ -268,17 +301,20 @@ function DeviceTable({
                 </button>
               </td>
               <td className="p-2">
-                <button
-                  onClick={() => toggleChat(device.id)}
-                  className="bg-blue-600 text-white px-3 py-1 rounded flex items-center gap-2"
-                >
-                  {openChatId === device.id ? "إخفاء" : "عرض"}
-                  {device.unreadCount > 0 && (
-                    <span className="inline-block w-5 h-5 text-xs font-bold bg-red-600 text-white rounded-full text-center">
-                      {device.unreadCount}
-                    </span>
-                  )}
-                </button>
+<button
+  onClick={() => toggleChat(device.id)}
+  className={`px-3 py-1 rounded flex items-center gap-2 text-white ${
+    openChatId === device.id ? "bg-yellow-500" : "bg-blue-600 hover:bg-blue-700"
+  }`}
+>
+  {openChatId === device.id ? "إخفاء" : "عرض"}
+  {device.unreadCount > 0 && (
+    <span className="inline-block w-5 h-5 text-xs font-bold bg-red-600 text-white rounded-full text-center">
+      {device.unreadCount}
+    </span>
+  )}
+</button>
+
               </td>
             </tr>
           ))}
@@ -643,12 +679,6 @@ const filteredDevices = devices
     )}
   </div>
 )}
-{/* <button
-  onClick={archiveDeliveredDevices}
-  className="mb-4 bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700"
->
-  ترحيل الأجهزة التي تم تسليمها إلى الأرشيف
-</button> */}
       <DeliveredDevicesControls />
         <SearchBox searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
         {showForm && (

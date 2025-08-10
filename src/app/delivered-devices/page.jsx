@@ -4,6 +4,8 @@ import { supabase } from '../../lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 import SearchBox from '../../components/SearchBox';
 import { DEPARTMENTS } from '../../lib/constants';
+import * as XLSX from 'xlsx';
+
 
 export default function DeliveredDevicesArchive() {
   const [localDevices, setLocalDevices] = useState([]);
@@ -13,6 +15,25 @@ export default function DeliveredDevicesArchive() {
   const [selectedDepartment, setSelectedDepartment] = useState('');
   const [dateFilter, setDateFilter] = useState('');
   const router = useRouter();
+
+
+  // دالة تصدير البيانات إلى إكسل
+const exportToExcel = () => {
+  if (filteredDevices.length === 0) {
+    alert('لا توجد بيانات للتصدير');
+    return;
+  }
+
+  // تحويل البيانات إلى ورقة عمل
+  const worksheet = XLSX.utils.json_to_sheet(filteredDevices);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'الأرشيف');
+
+  // إنشاء ملف وتحميله بصيغة XLS غير مضغوطة
+  XLSX.writeFile(workbook, `devices_archive_${new Date().toISOString().split('T')[0]}.xls`, { bookType: 'xls' });
+};
+
+
 
   // 1. تهيئة IndexedDB مع إصدار متقدم
   const initDB = useCallback(() => {
@@ -178,6 +199,22 @@ export default function DeliveredDevicesArchive() {
         >
           العودة للصفحة الرئيسية
         </button>
+
+        <div style={{ marginBottom: '15px', textAlign: 'right' }}>
+  <button
+    onClick={exportToExcel}
+    style={{
+      padding: '10px 15px',
+      backgroundColor: '#2196F3',
+      color: 'white',
+      border: 'none',
+      borderRadius: '4px',
+      cursor: 'pointer'
+    }}
+  >
+    📤 تصدير إلى Excel
+  </button>
+</div>
         
         <div>
           <button 
@@ -299,33 +336,31 @@ export default function DeliveredDevicesArchive() {
                   ))}
                 </tr>
               </thead>
-              <tbody>
-                {filteredDevices.map((device) => (
-                  <tr key={device.id} style={{
-                    backgroundColor: '#fff',
-                    borderBottom: '1px solid #eee',
-                    '&:hover': {
-                      backgroundColor: '#f5f5f5'
-                    }
-                  }}>
-                    <td style={{ padding: '12px 15px' }}>{device.customerName}</td>
-                    <td style={{ padding: '12px 15px' }}>{device.deviceName}</td>
-                    <td style={{ padding: '12px 15px' }}>{device.date}</td>
-                    <td style={{ padding: '12px 15px' }}>{device.time}</td>
-                    <td style={{ padding: '12px 15px' }}>{device.department}</td>
-                    <td style={{ padding: '12px 15px' }}>{device.employeeName}</td>
-                    <td style={{ padding: '12px 15px' }}>{device.delivery_date}</td>
-                    <td style={{ padding: '12px 15px' }}>{device.delivery_time}</td>
-                    <td style={{ 
-                      padding: '12px 15px',
-                      color: '#666',
-                      fontSize: '0.9em'
-                    }}>
-                      {new Date(device.archivedAt).toLocaleDateString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
+<tbody>
+  {filteredDevices.map((device, index) => (
+    <tr key={`${device.id}-${index}`} style={{
+      backgroundColor: '#fff',
+      borderBottom: '1px solid #eee',
+    }}>
+      <td style={{ padding: '12px 15px' }}>{device.customerName}</td>
+      <td style={{ padding: '12px 15px' }}>{device.deviceName}</td>
+      <td style={{ padding: '12px 15px' }}>{device.date}</td>
+      <td style={{ padding: '12px 15px' }}>{device.time}</td>
+      <td style={{ padding: '12px 15px' }}>{device.department}</td>
+      <td style={{ padding: '12px 15px' }}>{device.employeeName}</td>
+      <td style={{ padding: '12px 15px' }}>{device.delivery_date}</td>
+      <td style={{ padding: '12px 15px' }}>{device.delivery_time}</td>
+      <td style={{ 
+        padding: '12px 15px',
+        color: '#666',
+        fontSize: '0.9em'
+      }}>
+        {new Date(device.archivedAt).toLocaleDateString()}
+      </td>
+    </tr>
+  ))}
+</tbody>
+
             </table>
           </div>
         </>

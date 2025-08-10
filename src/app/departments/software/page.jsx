@@ -322,23 +322,38 @@ export default function DepartmentPage() {
       );
     }
   }
+async function handleChangeDepartment(id, newDepartment) {
+  if (currentUserRole !== "admin") return alert("لا تملك صلاحية تعديل القسم");
 
-  async function handleChangeDepartment(id, newDepartment) {
-    if (currentUserRole !== "admin") return alert("لا تملك صلاحية تعديل القسم");
+  const confirmChange = confirm(`هل أنت متأكد من تغيير القسم إلى "${newDepartment}"؟`);
+  if (!confirmChange) return; // إذا ضغط إلغاء، نوقف التنفيذ
 
-    const { error } = await supabase
-      .from("devices")
-      .update({ department: newDepartment })
-      .eq("id", id);
+  const { error } = await supabase
+    .from("devices")
+    .update({ department: newDepartment })
+    .eq("id", id);
 
-    if (!error) {
-      // حذف الجهاز من العرض لأنه انتقل لقسم آخر
-      setDevices((prev) => prev.filter((d) => d.id !== id));
-    } else {
-      alert("حدث خطأ أثناء تحديث القسم");
-    }
+  if (!error) {
+    setDevices((prev) => prev.filter((d) => d.id !== id)); // حذف الجهاز من العرض لأنه انتقل لقسم آخر
+  } else {
+    alert("حدث خطأ أثناء تحديث القسم");
   }
+}
+async function handleChangeEmployee(id, newEmployee) {
+  const confirmChange = confirm(`هل أنت متأكد من تغيير الموظف إلى "${newEmployee}"؟`);
+  if (!confirmChange) return; // إذا ضغط إلغاء، نوقف التنفيذ
 
+  const { error } = await supabase
+    .from("devices")
+    .update({ employeeName: newEmployee })
+    .eq("id", id);
+
+  if (!error) {
+    setDevices((prev) =>
+      prev.map((d) => (d.id === id ? { ...d, employeeName: newEmployee } : d))
+    );
+  }
+}
   function toggleChat(deviceId) {
     if (openChatId === deviceId) {
       setOpenChatId(null);
