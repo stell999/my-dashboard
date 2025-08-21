@@ -61,22 +61,31 @@ export default function DeliveredDevicesControls() {
   }
 
   return (
-    <div className="flex gap-4">
-      <button
-        onClick={archiveDeliveredDevices}
-        disabled={loading}
-        className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white px-4 py-2 rounded transition"
-      >
-        {loading ? "جاري المعالجة..." : "تصدير الأجهزة المسلّمة"}
-      </button>
+<div className="flex gap-4 -mt-4">
+  <button
+    onClick={() => {
+      if (window.confirm("هل أنت متأكد من تصدير الأجهزة المسلّمة؟")) {
+        archiveDeliveredDevices();
+      }
+    }}
+    disabled={loading}
+    className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white px-4 py-2 rounded transition"
+  >
+    {loading ? "جاري المعالجة..." : "تصدير الأجهزة المسلّمة"}
+  </button>
 
-      <button
-        onClick={deleteDeliveredDevices}
-        disabled={loading}
-        className="bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white px-4 py-2 rounded transition"
-      >
-        {loading ? "جاري المعالجة..." : "مسح الأجهزة المسلّمة"}
-      </button>
-    </div>
+  <button
+    onClick={() => {
+      if (window.confirm("هل أنت متأكد من مسح الأجهزة المسلّمة؟")) {
+        deleteDeliveredDevices();
+      }
+    }}
+    disabled={loading}
+    className="bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white px-4 py-2 rounded transition"
+  >
+    {loading ? "جاري المعالجة..." : "مسح الأجهزة المسلّمة"}
+  </button>
+</div>
+
   );
 }

@@ -689,6 +689,7 @@ const filteredDevices = devices
                                 <button onClick={archiveDeliveredDevices} style={{ backgroundColor: '#4CAF50', color: 'white', padding: '10px', borderRadius: '5px', cursor: 'pointer' }}>
   ترحيل الأجهزة التي تم تسليمها
 </button>
+
         <Filters
         
                 dateFilter={dateFilter}
@@ -739,8 +740,8 @@ const filteredDevices = devices
             )}
           </div>
         )}
-
-      <DeliveredDevicesControls />
+  <DeliveredDevicesControls />
+<hr className="my-6 border-t-2 border-gray-300" />
         <SearchBox searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
 
         {showForm && (
