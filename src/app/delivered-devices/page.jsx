@@ -17,14 +17,14 @@ export default function DeliveredDevicesArchive() {
   const router = useRouter();
 
   const debounceTimeout = useRef(null);
-  const searchInputRef = useRef(null); // 🔹 المرجع لحقل البحث
+  const searchInputRef = useRef(null);
 
-  // تطبيق الـ debounce على البحث
+  // تطبيق debounce على البحث
   useEffect(() => {
     if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
     debounceTimeout.current = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm);
-    }, 800); // تأخير البحث
+    }, 800);
     return () => clearTimeout(debounceTimeout.current);
   }, [searchTerm]);
 
@@ -50,11 +50,8 @@ export default function DeliveredDevicesArchive() {
       setDevicesCount(count || 0);
       setStorageStatus(`تم تحميل ${data?.length || 0} جهازاً`);
 
-      // 🔹 بعد تحديث البيانات، نعيد التركيز على مربع البحث
       setTimeout(() => {
-        if (searchInputRef.current) {
-          searchInputRef.current.focus();
-        }
+        if (searchInputRef.current) searchInputRef.current.focus();
       }, 50);
 
     } catch (error) {
@@ -67,21 +64,50 @@ export default function DeliveredDevicesArchive() {
     }
   }, []);
 
-  // استدعاء الجلب عند تغير debouncedSearchTerm أو الفلاتر الأخرى
   useEffect(() => {
     fetchDevices(debouncedSearchTerm, selectedDepartment, dateFilter);
   }, [debouncedSearchTerm, selectedDepartment, dateFilter, fetchDevices]);
 
-  // تصدير إلى Excel
-  const exportToExcel = () => {
-    if (devices.length === 0) {
-      alert('لا توجد بيانات للتصدير');
-      return;
+  // تصدير كل جدول archived_devices إلى Excel
+  const exportToExcel = async () => {
+    try {
+      setStorageStatus("📦 جاري تحميل جميع البيانات من قاعدة البيانات...");
+
+      const batchSize = 1000; // دفعة كل مرة
+      let allData = [];
+      let from = 0;
+
+      while (true) {
+        const { data, error } = await supabase
+          .from('archived_devices')
+          .select('id, customerName, deviceName, issue, date, time, department, employeeName, delivery_date, delivery_time')
+          .order('id', { ascending: true }) // ترتيب ثابت
+          .range(from, from + batchSize - 1);
+
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+
+        allData = allData.concat(data);
+        from += batchSize;
+
+        if (data.length < batchSize) break; // وصلنا لآخر دفعة
+      }
+
+      if (allData.length === 0) {
+        alert('⚠️ لا توجد بيانات للتصدير');
+        return;
+      }
+
+      const worksheet = XLSX.utils.json_to_sheet(allData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'الأرشيف');
+      XLSX.writeFile(workbook, `devices_archive_${new Date().toISOString().split('T')[0]}.xls`, { bookType: 'xls' });
+
+      setStorageStatus(`✅ تم تصدير ${allData.length} سجل من قاعدة البيانات`);
+    } catch (error) {
+      console.error("❌ خطأ أثناء التصدير:", error);
+      setStorageStatus("❌ فشل في التصدير من قاعدة البيانات");
     }
-    const worksheet = XLSX.utils.json_to_sheet(devices);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'الأرشيف');
-    XLSX.writeFile(workbook, `devices_archive_${new Date().toISOString().split('T')[0]}.xls`, { bookType: 'xls' });
   };
 
   if (loading) return (
@@ -124,11 +150,10 @@ export default function DeliveredDevicesArchive() {
       </h1>
 
       <div style={{ display: 'flex', gap: '15px', marginBottom: '20px', flexWrap: 'wrap' }}>
-        {/* 🔹 حقل البحث مع المرجع */}
         <div>
           <label>بحث:</label>
           <input
-            ref={searchInputRef} // المرجع للحقل
+            ref={searchInputRef}
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
